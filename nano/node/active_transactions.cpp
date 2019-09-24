@@ -115,7 +115,7 @@ void nano::active_transactions::post_confirmation_height_set (nano::transaction 
 	else
 	{
 		auto hash (block_a->hash ());
-		nano::unique_lock<std::mutex> lock (mutex);
+		nano::lock_guard<std::mutex> lock (mutex);
 		auto existing (blocks.find (hash));
 		if (existing != blocks.end ())
 		{
@@ -143,6 +143,7 @@ void nano::active_transactions::post_confirmation_height_set (nano::transaction 
 
 				election->clear_blocks ();
 				election->clear_dependent ();
+				roots.erase (election->status.winner->qualified_root ());
 			}
 		}
 	}
@@ -931,6 +932,7 @@ void nano::active_transactions::clear_block (nano::block_hash const & hash_a)
 		auto election = existing->second;
 		election->clear_blocks ();
 		election->clear_dependent ();
+		roots.erase (election->status.winner->qualified_root ());
 	}
 }
 

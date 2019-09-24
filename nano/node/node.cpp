@@ -1183,9 +1183,8 @@ void nano::node::process_confirmed (nano::election_status const & status_a, uint
 {
 	auto block_a (status_a.winner);
 	auto hash (block_a->hash ());
-	nano::block_sideband sideband;
 	auto transaction (store.tx_begin_read ());
-	if (store.block_get (transaction, hash, &sideband) != nullptr)
+	if (store.block_get (transaction, hash) != nullptr)
 	{
 		if (status_a.type == nano::election_status_type::active_confirmed_quorum)
 		{

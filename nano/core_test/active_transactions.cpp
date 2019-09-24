@@ -68,14 +68,18 @@ TEST (active_transactions, adjusted_difficulty_priority)
 	}
 
 	// Confirm elections
+	system.deadline_set (10s);
 	while (node1.active.size () != 0)
 	{
-		nano::lock_guard<std::mutex> active_guard (node1.active.mutex);
+		nano::unique_lock <std::mutex> lk (node1.active.mutex);
 		auto it (node1.active.roots.begin ());
 		while (!node1.active.roots.empty () && it != node1.active.roots.end ())
 		{
 			auto election (it->election);
 			election->confirm_once ();
+			lk.unlock ();
+			ASSERT_NO_ERROR (system.poll ());
+			lk.lock ();
 			it = node1.active.roots.begin ();
 		}
 	}
@@ -266,13 +270,17 @@ TEST (active_transactions, keep_local)
 	{
 		ASSERT_NO_ERROR (system.poll ());
 	}
+	system.deadline_set (10s);
 	while (node1.active.size () != 0)
 	{
-		nano::lock_guard<std::mutex> active_guard (node1.active.mutex);
+		nano::unique_lock<std::mutex> lk (node1.active.mutex);
 		auto it (node1.active.roots.begin ());
 		while (!node1.active.roots.empty () && it != node1.active.roots.end ())
 		{
 			(it->election)->confirm_once ();
+			lk.unlock ();
+			ASSERT_NO_ERROR (system.poll ());
+			lk.lock ();
 			it = node1.active.roots.begin ();
 		}
 	}
@@ -282,7 +290,7 @@ TEST (active_transactions, keep_local)
 	node1.process_active (open2);
 	//none are dropped since none are long_unconfirmed
 	system.deadline_set (10s);
-	while (node1.active.size () != 4)
+	while (node1.active.size () != 2)
 	{
 		ASSERT_NO_ERROR (system.poll ());
 	}
@@ -331,12 +339,15 @@ TEST (active_transactions, prioritize_chains)
 	}
 	while (node1.active.size () != 0)
 	{
-		nano::lock_guard<std::mutex> active_guard (node1.active.mutex);
+		nano::unique_lock<std::mutex> active_lk (node1.active.mutex);
 		auto it (node1.active.roots.get<1> ().begin ());
 		while (!node1.active.roots.empty () && it != node1.active.roots.get<1> ().end ())
 		{
 			auto election (it->election);
 			election->confirm_once ();
+			active_lk.unlock ();
+			ASSERT_NO_ERROR (system.poll ());
+			active_lk.lock ();
 			it = node1.active.roots.get<1> ().begin ();
 		}
 	}

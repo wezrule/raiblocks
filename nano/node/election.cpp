@@ -50,7 +50,6 @@ void nano::election::confirm_once (nano::election_status_type type_a)
 		{
 			--node.active.long_unconfirmed_size;
 		}
-		node.active.roots.erase (status.winner->qualified_root ());
 	}
 }
 

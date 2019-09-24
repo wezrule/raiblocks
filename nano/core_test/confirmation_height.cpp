@@ -995,9 +995,19 @@ TEST (confirmation_height, callback_confirmed_history)
 		// The write guard prevents the confirmation height processor doing any writes
 		auto write_guard = node->write_database_queue.wait (nano::writer::testing);
 		system.deadline_set (10s);
-		while (node->active.size () > 0)
 		{
-			ASSERT_NO_ERROR (system.poll ());
+			nano::unique_lock<std::mutex> lk (node->active.mutex);
+			auto it (node->active.roots.begin ());
+			while (it != node->active.roots.end ())
+			{
+				while (!it->election->confirmed)
+				{
+					lk.unlock ();
+					std::this_thread::yield ();
+					lk.lock ();
+				}
+				++it;
+			}
 		}
 
 		ASSERT_EQ (0, node->active.list_confirmed ().size ());
@@ -1073,9 +1083,19 @@ TEST (confirmation_height, dependent_election)
 	// Wait until it has been processed
 	node->block_confirm (send2);
 	system.deadline_set (10s);
-	while (node->active.size () > 0)
 	{
-		ASSERT_NO_ERROR (system.poll ());
+		nano::unique_lock<std::mutex> lk (node->active.mutex);
+		auto it (node->active.roots.begin ());
+		while (it != node->active.roots.end ())
+		{
+			while (!it->election->confirmed)
+			{
+				lk.unlock ();
+				std::this_thread::yield ();
+				lk.lock ();
+			}
+			++it;
+		}
 	}
 
 	system.deadline_set (10s);
@@ -1134,9 +1154,19 @@ TEST (confirmation_height, dependent_election_after_already_cemented)
 		node->block_confirm (send1);
 		auto write_guard = node->write_database_queue.wait (nano::writer::testing);
 		system.deadline_set (10s);
-		while (node->active.size () > 0)
 		{
-			ASSERT_NO_ERROR (system.poll ());
+			nano::unique_lock<std::mutex> lk (node->active.mutex);
+			auto it (node->active.roots.begin ());
+			while (it != node->active.roots.end ())
+			{
+				while (!it->election->confirmed)
+				{
+					lk.unlock ();
+					std::this_thread::yield ();
+					lk.lock ();
+				}
+				++it;
+			}
 		}
 
 		ASSERT_EQ (0, node->active.list_confirmed ().size ());
