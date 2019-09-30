@@ -955,7 +955,7 @@ void nano::json_handler::block_info ()
 			response_l.put ("balance", balance.convert_to<std::string> ());
 			response_l.put ("height", std::to_string (sideband.height));
 			response_l.put ("local_timestamp", std::to_string (sideband.timestamp));
-			auto confirmed (node.block_confirmed_or_being_confirmed (transaction, hash));
+			auto confirmed (node.ledger.block_confirmed (transaction, hash));
 			response_l.put ("confirmed", confirmed);
 
 			bool json_block_l = request.get<bool> ("json_block", false);
@@ -993,7 +993,7 @@ void nano::json_handler::block_confirm ()
 		auto block_l (node.store.block_get (transaction, hash));
 		if (block_l != nullptr)
 		{
-			if (!node.block_confirmed_or_being_confirmed (transaction, hash))
+			if (!node.ledger.block_confirmed (transaction, hash))
 			{
 				// Start new confirmation for unconfirmed block
 				node.block_confirm (std::move (block_l));
@@ -1001,7 +1001,7 @@ void nano::json_handler::block_confirm ()
 			else
 			{
 				// Add record in confirmation history for confirmed block
-				nano::election_status status{ block_l, 0, std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ()), std::chrono::duration_values<std::chrono::milliseconds>::zero (), nano::election_status_type::active_confirmation_height };
+				nano::election_status status{ block_l, 0, std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ()), std::chrono::duration_values<std::chrono::milliseconds>::zero (), 0, nano::election_status_type::active_confirmation_height };
 				{
 					nano::lock_guard<std::mutex> lock (node.active.mutex);
 					node.active.confirmed.push_back (status);
@@ -1106,7 +1106,7 @@ void nano::json_handler::blocks_info ()
 					entry.put ("balance", balance.convert_to<std::string> ());
 					entry.put ("height", std::to_string (sideband.height));
 					entry.put ("local_timestamp", std::to_string (sideband.timestamp));
-					auto confirmed (node.block_confirmed_or_being_confirmed (transaction, hash));
+					auto confirmed (node.ledger.block_confirmed (transaction, hash));
 					entry.put ("confirmed", confirmed);
 
 					if (json_block_l)
@@ -1795,6 +1795,7 @@ void nano::json_handler::confirmation_history ()
 				election.put ("duration", i->election_duration.count ());
 				election.put ("time", i->election_end.count ());
 				election.put ("tally", i->tally.to_string_dec ());
+				election.put ("request_count", i->confirmation_request_count);
 				elections.push_back (std::make_pair ("", election));
 			}
 			running_total += i->election_duration;
@@ -4804,7 +4805,7 @@ bool block_confirmed (nano::node & node, nano::transaction & transaction, nano::
 		is_confirmed = true;
 	}
 	// Check whether the confirmation height is set
-	else if (node.block_confirmed_or_being_confirmed (transaction, hash))
+	else if (node.ledger.block_confirmed (transaction, hash))
 	{
 		is_confirmed = true;
 	}
