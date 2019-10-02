@@ -134,6 +134,7 @@ int main (int argc, char * const * argv)
 		("debug_peers", "Display peer IPv6:port connections")
 		("debug_cemented_block_count", "Displays the number of cemented (confirmed) blocks")
 		("debug_stacktrace", "Display an example stacktrace")
+		("debug_account_versions", "Display all accounts (including unpocketed) and the epoch version")
 		("platform", boost::program_options::value<std::string> (), "Defines the <platform> for OpenCL commands")
 		("device", boost::program_options::value<std::string> (), "Defines <device> for OpenCL command")
 		("threads", boost::program_options::value<std::string> (), "Defines <threads> count for OpenCL command")
@@ -1095,6 +1096,77 @@ int main (int argc, char * const * argv)
 #endif
 			nano::inactive_node node (data_path);
 			node.node->logger.always_log (nano::severity_level::error, "Testing system logger");
+		}
+		else if (vm.count ("debug_account_versions"))
+		{
+			nano::inactive_node node (data_path);
+			// std::cout << "Outputting any frontier hashes which have associated key hashes in the unchecked table (may take some time)...\n";
+
+			// Cache the account heads to make searching quicker against unchecked keys.
+			auto transaction (node.node->store.tx_begin_read ());
+			std::vector<std::unordered_set<nano::account>> account_versions (nano::normalized_epoch (nano::epoch::max));
+
+//			std::unordered_set<nano::block_hash> frontier_hashes;
+			for (auto i (node.node->store.latest_begin (transaction)), n (node.node->store.latest_end ()); i != n; ++i)
+			{
+				auto const & account (i->first);
+				auto const & account_info (i->second);
+
+				// Epoch 0 will be index 0 for instance
+				auto epoch_idx = nano::normalized_epoch (account_info.epoch ());
+				account_versions[epoch_idx].emplace (account);
+			}
+
+			std::unordered_map<nano::account, int> unopened_highest_pending;
+			for (auto i (node.node->store.pending_begin (transaction)), n (node.node->store.pending_end ()); i != n; ++i)
+			{
+				nano::pending_key const & key (i->first);
+				nano::pending_info const & info (i->second);
+
+				auto exists = std::any_of (account_versions.begin (), account_versions.end (), [&account = key.account](auto const & account_version) {
+					return account_version.find (account) != account_version.end ();
+				});
+
+				if (!exists)
+				{
+					// This is an unopened account, need to find the highest pending version this account has, keep a tally
+					auto it = unopened_highest_pending.find (key.account);
+					auto epoch = nano::normalized_epoch (info.epoch);
+					if (it != unopened_highest_pending.cend ())
+					{
+						// Found it, compare existing value
+						if (epoch > it->second)
+						{
+							it->second = epoch;
+						}
+					}
+					else
+					{
+						unopened_highest_pending.emplace (key.account, epoch);
+					}
+				}
+			}
+
+			// Merge with 
+//			std::vector<std::unordered_set<nano::account>> account_versions;
+
+			std::cout << "Opened accounts: " << "\n";
+			for (auto i = 0u; i < account_versions.size (); ++i)
+			{
+				std::cout << "Account version " << i << " num accounts: " << account_versions[i].size () << "\n";
+			}
+			std::cout << "Unopened accounts: " << "\n";
+
+			std::vector<size_t> unopened_account_version_sizes (nano::normalized_epoch (nano::epoch::max));
+
+			for (auto & pair : unopened_highest_pending)
+			{
+				++unopened_account_version_sizes[pair.second];
+			}
+			for (auto i = 0u; i < unopened_account_version_sizes.size (); ++i)
+			{
+				std::cout << "Account version " << i << " num accounts: " << unopened_account_version_sizes[i] << "\n";
+			}
 		}
 		else if (vm.count ("version"))
 		{
