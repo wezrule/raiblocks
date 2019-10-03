@@ -587,7 +587,7 @@ void nano::mdb_store::upgrade_v14_to_v15 (nano::write_transaction const & transa
 
 	upgrade_counters pending_counters (count (transaction_a, pending_v0), count (transaction_a, pending_v1));
 	std::vector<std::pair<nano::pending_key, nano::pending_info>> pending_infos;
-	pending_infos.reserve (pending_counters.before_v0 + pending_counters.after_v0);
+	pending_infos.reserve (pending_counters.before_v0 + pending_counters.before_v1);
 
 	nano::mdb_merge_iterator<nano::pending_key, nano::pending_info_v14> i_pending (transaction_a, pending_v0, pending_v1);
 	nano::mdb_merge_iterator<nano::pending_key, nano::pending_info_v14> n_pending{};

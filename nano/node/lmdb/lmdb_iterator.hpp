@@ -168,6 +168,8 @@ public:
 	impl1 (std::make_unique<nano::mdb_iterator<T, U>> (transaction_a, db1_a)),
 	impl2 (std::make_unique<nano::mdb_iterator<T, U>> (transaction_a, db2_a))
 	{
+		// This sets up from_first_database correctly
+		(void)least_iterator ();
 	}
 
 	mdb_merge_iterator () :
@@ -180,12 +182,14 @@ public:
 	impl1 (std::make_unique<nano::mdb_iterator<T, U>> (transaction_a, db1_a, val_a)),
 	impl2 (std::make_unique<nano::mdb_iterator<T, U>> (transaction_a, db2_a, val_a))
 	{
+		(void)least_iterator ();
 	}
 
 	mdb_merge_iterator (nano::mdb_merge_iterator<T, U> && other_a)
 	{
 		impl1 = std::move (other_a.impl1);
 		impl2 = std::move (other_a.impl2);
+		(void)least_iterator ();
 	}
 
 	mdb_merge_iterator (nano::mdb_merge_iterator<T, U> const &) = delete;
