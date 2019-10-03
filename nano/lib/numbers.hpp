@@ -293,8 +293,8 @@ bool from_string_hex (std::string const & value_a, T & target_a)
 	auto error (value_a.empty ());
 	if (!error)
 	{
-		// Temp hack to get around passing in a nano::pow length string
-		error = (value_a.size () > sizeof (T) * 2) && (value_a.size () != sizeof (nano::nano_pow::real_byte_type) * 2);
+		// Temp hack (second boolean operand) to get around a nano::nano_pow string being passed in which has only 64bit work.
+		error = (value_a.size () > sizeof (T) * 2) && (value_a.size () != 12 * 2);
 		if (!error)
 		{
 			std::stringstream stream (value_a);
