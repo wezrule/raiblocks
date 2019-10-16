@@ -284,11 +284,9 @@ bool nano::send_block::deserialize_json (boost::property_tree::ptree const & tre
 				error = hashables.balance.decode_hex (balance_l);
 				if (!error)
 				{
-					uint64_t work_l1;
-					error = nano::from_string_hex (work_l, work_l1);
+					error = nano::from_string_hex (work_l, work);
 					if (!error)
 					{
-						work = work_l1;
 						error = signature.decode_hex (signature_l);
 					}
 				}
@@ -338,12 +336,7 @@ hashables (error_a, tree_a)
 			error_a = signature.decode_hex (signature_l);
 			if (!error_a)
 			{
-				uint64_t work_l1;
-				error_a = nano::from_string_hex (work_l, work_l1);
-				if (!error_a)
-				{
-					work = work_l1;
-				}
+				error_a = nano::from_string_hex (work_l, work);
 			}
 		}
 		catch (std::runtime_error const &)
@@ -504,11 +497,9 @@ hashables (error_a, tree_a)
 		{
 			auto work_l (tree_a.get<std::string> ("work"));
 			auto signature_l (tree_a.get<std::string> ("signature"));
-			uint64_t work_l1;
-			error_a = nano::from_string_hex (work_l, work_l1);
+			error_a = nano::from_string_hex (work_l, work);
 			if (!error_a)
 			{
-				work = work_l1;
 				error_a = signature.decode_hex (signature_l);
 			}
 		}
@@ -616,11 +607,9 @@ bool nano::open_block::deserialize_json (boost::property_tree::ptree const & tre
 				error = hashables.account.decode_hex (account_l);
 				if (!error)
 				{
-					uint64_t work_l1;
-					error = nano::from_string_hex (work_l, work_l1);
+					error = nano::from_string_hex (work_l, work);
 					if (!error)
 					{
-						work = work_l1;
 						error = signature.decode_hex (signature_l);
 					}
 				}
@@ -760,11 +749,9 @@ hashables (error_a, tree_a)
 		{
 			auto work_l (tree_a.get<std::string> ("work"));
 			auto signature_l (tree_a.get<std::string> ("signature"));
-			uint64_t work_l1;
-			error_a = nano::from_string_hex (work_l, work_l1);
+			error_a = nano::from_string_hex (work_l, work);
 			if (!error_a)
 			{
-				work = work_l1;
 				error_a = signature.decode_hex (signature_l);
 			}
 		}
@@ -859,11 +846,9 @@ bool nano::change_block::deserialize_json (boost::property_tree::ptree const & t
 			error = hashables.representative.decode_hex (representative_l);
 			if (!error)
 			{
-				uint64_t work_l1;
-				error = nano::from_string_hex (work_l, work_l1);
+				error = nano::from_string_hex (work_l, work);
 				if (!error)
 				{
-					work = work_l1;
 					error = signature.decode_hex (signature_l);
 				}
 			}
@@ -1039,11 +1024,9 @@ hashables (error_a, tree_a)
 			error_a = type_l != "state";
 			if (!error_a)
 			{
-				uint64_t work_l1;
-				error_a = nano::from_string_hex (work_l, work_l1);
+				error_a = nano::from_string_hex (work_l, work);
 				if (!error_a)
 				{
-					work = work_l1;
 					error_a = signature.decode_hex (signature_l);
 				}
 			}
@@ -1169,11 +1152,9 @@ bool nano::state_block::deserialize_json (boost::property_tree::ptree const & tr
 						error = hashables.link.decode_account (link_l) && hashables.link.decode_hex (link_l);
 						if (!error)
 						{
-							uint64_t work_l1;
-							error = nano::from_string_hex (work_l, work_l1);
+							error = nano::from_string_hex (work_l, work);
 							if (!error)
 							{
-								work = work_l1;
 								error = signature.decode_hex (signature_l);
 							}
 						}
@@ -1445,11 +1426,9 @@ bool nano::receive_block::deserialize_json (boost::property_tree::ptree const & 
 			error = hashables.source.decode_hex (source_l);
 			if (!error)
 			{
-				uint64_t work_l1;
-				error = nano::from_string_hex (work_l, work_l1);
+				error = nano::from_string_hex (work_l, work);
 				if (!error)
 				{
-					work = work_l1;
 					error = signature.decode_hex (signature_l);
 				}
 			}
@@ -1498,12 +1477,7 @@ hashables (error_a, tree_a)
 			error_a = signature.decode_hex (signature_l);
 			if (!error_a)
 			{
-				uint64_t work_l1;
-				error_a = nano::from_string_hex (work_l, work_l1);
-				if (!error_a)
-				{
-					work = work_l1;
-				}
+				error_a = nano::from_string_hex (work_l, work);
 			}
 		}
 		catch (std::runtime_error const &)
