@@ -131,7 +131,7 @@ public:
 	bool valid_predecessor (nano::block const &) const override;
 	send_hashables hashables;
 	nano::signature signature;
-	uint64_t work;
+	std::atomic<uint64_t> work;
 	static size_t constexpr size = nano::send_hashables::size + sizeof (signature) + sizeof (work);
 };
 class receive_hashables
@@ -175,7 +175,7 @@ public:
 	bool valid_predecessor (nano::block const &) const override;
 	receive_hashables hashables;
 	nano::signature signature;
-	uint64_t work;
+	std::atomic<uint64_t> work;
 	static size_t constexpr size = nano::receive_hashables::size + sizeof (signature) + sizeof (work);
 };
 class open_hashables
@@ -223,7 +223,7 @@ public:
 	bool valid_predecessor (nano::block const &) const override;
 	nano::open_hashables hashables;
 	nano::signature signature;
-	uint64_t work;
+	std::atomic<uint64_t> work;
 	static size_t constexpr size = nano::open_hashables::size + sizeof (signature) + sizeof (work);
 };
 class change_hashables
@@ -267,7 +267,7 @@ public:
 	bool valid_predecessor (nano::block const &) const override;
 	nano::change_hashables hashables;
 	nano::signature signature;
-	uint64_t work;
+	std::atomic<uint64_t> work;
 	static size_t constexpr size = nano::change_hashables::size + sizeof (signature) + sizeof (work);
 };
 class state_hashables
@@ -327,7 +327,7 @@ public:
 	bool valid_predecessor (nano::block const &) const override;
 	nano::state_hashables hashables;
 	nano::signature signature;
-	uint64_t work;
+	std::atomic<uint64_t> work;
 	static size_t constexpr size = nano::state_hashables::size + sizeof (signature) + sizeof (work);
 };
 class block_visitor
