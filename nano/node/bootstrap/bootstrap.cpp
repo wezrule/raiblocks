@@ -354,7 +354,8 @@ void nano::bootstrap_attempt::populate_connections ()
 			if (auto client = c.lock ())
 			{
 				new_clients.push_back (client);
-				endpoints.insert (client->channel->socket->remote_endpoint ());
+				auto socket_l = client->channel->socket.lock ();
+				endpoints.insert (socket_l->remote_endpoint ());
 				double elapsed_sec = client->elapsed_seconds ();
 				auto blocks_per_sec = client->block_rate ();
 				rate_sum += blocks_per_sec;
@@ -497,7 +498,7 @@ void nano::bootstrap_attempt::pool_connection (std::shared_ptr<nano::bootstrap_c
 	if (!stopped && !client_a->pending_stop && !node->bootstrap_initiator.excluded_peers.check (client_a->channel->get_tcp_endpoint ()))
 	{
 		// Idle bootstrap client socket
-		client_a->channel->socket->start_timer (node->network_params.node.idle_timeout);
+		client_a->channel->socket.lock ()->start_timer (node->network_params.node.idle_timeout);
 		// Push into idle deque
 		idle.push_front (client_a);
 	}
@@ -513,7 +514,7 @@ void nano::bootstrap_attempt::stop ()
 	{
 		if (auto client = i.lock ())
 		{
-			client->channel->socket->close ();
+			client->channel->socket.lock ()->close ();
 		}
 	}
 	if (auto i = frontiers.lock ())
@@ -616,7 +617,7 @@ void nano::bootstrap_attempt::attempt_restart_check (nano::unique_lock<std::mute
 			{
 				if (auto client = i.lock ())
 				{
-					client->channel->socket->close ();
+					client->channel->socket.lock ()->close ();
 				}
 			}
 			idle.clear ();
