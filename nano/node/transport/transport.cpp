@@ -84,6 +84,9 @@ void nano::transport::channel::send (nano::message const & message_a, std::funct
 	auto detail (visitor.result);
 	if (!is_droppable_a || !limiter.should_drop (buffer.size ()))
 	{
+		
+
+		// TODO: THis could be a problem?
 		send_buffer (buffer, detail, callback_a);
 		node.stats.inc (nano::stat::type::message, detail, nano::stat::dir::out);
 	}
