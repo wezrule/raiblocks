@@ -48,11 +48,18 @@ void nano::socket::async_read (std::shared_ptr<std::vector<uint8_t>> buffer_a, s
 			boost::asio::async_read (this_l->tcp_socket, boost::asio::buffer (buffer_a->data (), size_a),
 			boost::asio::bind_executor (this_l->strand,
 			[this_l, buffer_a, callback_a](boost::system::error_code const & ec, size_t size_a) {
-				if (auto node = this_l->node.lock ())
+				if (!this_l->closed)
 				{
-					node->stats.add (nano::stat::type::traffic_tcp, nano::stat::dir::in, size_a);
-					this_l->stop_timer ();
-					callback_a (ec, size_a);
+					if (auto node = this_l->node.lock ())
+					{
+						node->stats.add (nano::stat::type::traffic_tcp, nano::stat::dir::in, size_a);
+						this_l->stop_timer ();
+						callback_a (ec, size_a);
+					}
+				}
+				else
+				{
+					this_l->send_queue.clear ();
 				}
 			}));
 		}));
@@ -67,19 +74,26 @@ void nano::socket::async_write (nano::shared_const_buffer const & buffer_a, std:
 		if (writer_concurrency == nano::socket::concurrency::multi_writer)
 		{
 			boost::asio::post (strand, boost::asio::bind_executor (strand, [buffer_a, callback_a, this_l]() {
-				bool write_in_progress = !this_l->send_queue.empty ();
-				auto queue_size = this_l->send_queue.size ();
-				if (queue_size < this_l->queue_size_max)
+				if (!this_l->closed)
 				{
-					this_l->send_queue.emplace_back (nano::socket::queue_item{ buffer_a, callback_a });
+					bool write_in_progress = !this_l->send_queue.empty ();
+					auto queue_size = this_l->send_queue.size ();
+					if (queue_size < this_l->queue_size_max)
+					{
+						this_l->send_queue.emplace_back (nano::socket::queue_item{ buffer_a, callback_a });
+					}
+					else if (auto node_l = this_l->node.lock ())
+					{
+						node_l->stats.inc (nano::stat::type::tcp, nano::stat::detail::tcp_write_drop, nano::stat::dir::out);
+					}
+					if (!write_in_progress)
+					{
+						this_l->write_queued_messages ();
+					}
 				}
-				else if (auto node_l = this_l->node.lock ())
+				else
 				{
-					node_l->stats.inc (nano::stat::type::tcp, nano::stat::detail::tcp_write_drop, nano::stat::dir::out);
-				}
-				if (!write_in_progress)
-				{
-					this_l->write_queued_messages ();
+					this_l->send_queue.clear ();
 				}
 			}));
 		}
