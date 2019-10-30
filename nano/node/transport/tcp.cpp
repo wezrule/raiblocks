@@ -347,6 +347,7 @@ void nano::transport::tcp_channels::stop ()
 	}
 	channels.clear ();
 	bootstrap_servers.clear ();
+	sockets.clear ();
 }
 
 bool nano::transport::tcp_channels::max_ip_connections (nano::tcp_endpoint const & endpoint_a)
