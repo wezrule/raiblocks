@@ -346,7 +346,18 @@ void nano::transport::tcp_channels::stop ()
 		}*/
 	}
 	channels.clear ();
+	for (auto server : bootstrap_servers)
+	{
+		server->stop ();
+		server = nullptr;
+	}
+
 	bootstrap_servers.clear ();
+
+	for (auto socket : sockets)
+	{
+		socket->close ()l
+	}
 	sockets.clear ();
 }
 
@@ -590,7 +601,6 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 										node_l->network.tcp_channels.insert (response_server);
 										node_l->network.tcp_channels.sockets.erase (std::find (node_l->network.tcp_channels.sockets.begin (), node_l->network.tcp_channels.sockets.end (), socket_w.lock ()));
 									}
-								}
 									else
 									{
 										if (node_l->config.logging.network_node_id_handshake_logging ())
