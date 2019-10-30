@@ -20,7 +20,10 @@ io_timeout (io_timeout_a)
 
 nano::socket::~socket ()
 {
-	close_internal ();
+	auto this_l (shared_from_this ());
+	boost::asio::dispatch (strand, boost::asio::bind_executor (strand, [this_l] {
+		this_l->close_internal ();
+	}));
 }
 
 void nano::socket::async_connect (nano::tcp_endpoint const & endpoint_a, std::function<void(boost::system::error_code const &)> callback_a)
@@ -253,18 +256,19 @@ void nano::socket::close ()
 	}));
 }
 
+
+
 // This must be called from a strand or the destructor
 void nano::socket::close_internal ()
 {
-	if (!closed)
+	if (!closed.exchange (true))
 	{
-		closed = true;
 		io_timeout = boost::none;
 		boost::system::error_code ec;
 
 		// Ignore error code for shutdown as it is best-effort
-	//	tcp_socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both, ec);
-	//	tcp_socket.close (ec);
+		tcp_socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both, ec);
+		tcp_socket.close (ec);
 		send_queue.clear ();
 		if (ec)
 		{
