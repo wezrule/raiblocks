@@ -356,7 +356,7 @@ void nano::transport::tcp_channels::stop ()
 
 	for (auto socket : sockets)
 	{
-		socket->close ()l
+		socket->close ();
 	}
 	sockets.clear ();
 }
