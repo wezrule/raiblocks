@@ -106,6 +106,7 @@ namespace transport
 		void start_tcp_receive_node_id (std::shared_ptr<nano::transport::channel_tcp>, std::shared_ptr<nano::socket> socket_a, nano::endpoint const &, std::shared_ptr<std::vector<uint8_t>>, std::function<void(std::shared_ptr<nano::transport::channel>)> const &);
 		void udp_fallback (nano::endpoint const &, std::function<void(std::shared_ptr<nano::transport::channel>)> const &);
 		nano::node & node;
+		std::vector<std::shared_ptr<nano::socket>> sockets;
 
 	private:
 		class endpoint_tag

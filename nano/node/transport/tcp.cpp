@@ -483,7 +483,6 @@ void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a
 		node.network.tcp_channels.udp_fallback (endpoint_a, callback_a);
 		return;
 	}
-	static std::vector<std::shared_ptr<nano::socket>> sockets;
 	auto socket (std::make_shared<nano::socket> (node.shared_from_this (), boost::none, nano::socket::concurrency::multi_writer));
 	sockets.push_back (socket);
 	auto channel (std::make_shared<nano::transport::channel_tcp> (node, socket->weak_from_this ()));
@@ -588,8 +587,9 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 										response_server->type = nano::bootstrap_server_type::realtime_response_server;
 										response_server->remote_node_id = channel_a->get_node_id ();
 										node_l->network.tcp_channels.insert (response_server);
-										response_server->receive ();
+										node_l->network.tcp_channels.sockets.erase (std::find (node_l->network.tcp_channels.sockets.begin (), node_l->network.tcp_channels.sockets.end (), socket_w.lock ()));
 									}
+								}
 									else
 									{
 										if (node_l->config.logging.network_node_id_handshake_logging ())

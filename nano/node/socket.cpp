@@ -20,10 +20,10 @@ io_timeout (io_timeout_a)
 
 nano::socket::~socket ()
 {
-	auto this_l (shared_from_this ());
-	boost::asio::dispatch (strand, boost::asio::bind_executor (strand, [this_l] {
-		this_l->close_internal ();
-	}));
+//	auto this_l (shared_from_this ());
+//	boost::asio::dispatch (strand, boost::asio::bind_executor (strand, [this_l] {
+		close_internal ();
+//	}));
 }
 
 void nano::socket::async_connect (nano::tcp_endpoint const & endpoint_a, std::function<void(boost::system::error_code const &)> callback_a)
