@@ -103,6 +103,8 @@ void nano::socket::async_write (nano::shared_const_buffer const & buffer_a, std:
 			nano::async_write (tcp_socket, buffer_a,
 			boost::asio::bind_executor (strand,
 			[this_l, callback_a](boost::system::error_code const & ec, size_t size_a) {
+				if (!this_l->closed)
+				{
 				if (auto node = this_l->node.lock ())
 				{
 					node->stats.add (nano::stat::type::traffic_tcp, nano::stat::dir::out, size_a);
@@ -111,6 +113,11 @@ void nano::socket::async_write (nano::shared_const_buffer const & buffer_a, std:
 					{
 						callback_a (ec, size_a);
 					}
+				}
+				}
+				else
+				{
+					this_l->send_queue.clear ();				
 				}
 			}));
 		}
@@ -153,9 +160,17 @@ void nano::socket::write_queued_messages ()
 							this_l->start_timer (node->network_params.node.idle_timeout);
 						}
 					}
+					else
+					{
+						this_l->send_queue.clear ();
+					}
 				}
 			}
 		}));
+	}
+	else
+	{
+		send_queue.clear ();	
 	}
 }
 
@@ -207,6 +222,10 @@ void nano::socket::checkup ()
 				else if (!this_l->closed)
 				{
 					this_l->checkup ();
+				}
+				else
+				{
+					this_l->send_queue.clear ();
 				}
 			}
 		});
