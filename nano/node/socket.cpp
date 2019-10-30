@@ -263,8 +263,8 @@ void nano::socket::close_internal ()
 		boost::system::error_code ec;
 
 		// Ignore error code for shutdown as it is best-effort
-		tcp_socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both, ec);
-		tcp_socket.close (ec);
+	//	tcp_socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both, ec);
+	//	tcp_socket.close (ec);
 		send_queue.clear ();
 		if (ec)
 		{
