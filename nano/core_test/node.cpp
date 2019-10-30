@@ -134,7 +134,7 @@ TEST (node, send_single_observing_peer)
 
 TEST (node, send_single_many_peers)
 {
-	nano::system system (24000, 10, nano::transport::transport_type::udp);
+	nano::system system (24000, 10);
 	nano::keypair key2;
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	system.wallet (1)->insert_adhoc (key2.prv);
