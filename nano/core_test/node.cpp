@@ -134,7 +134,18 @@ TEST (node, send_single_observing_peer)
 
 TEST (node, send_single_many_peers)
 {
-	nano::system system (24000, 10, nano::transport::transport_type::udp);
+	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.disable_lazy_bootstrap = true;
+	node_flags.disable_legacy_bootstrap = true;
+	node_flags.disable_wallet_bootstrap = true;
+	node_flags.disable_bootstrap_listener = true;
+	for (auto i = 0; i < 10; ++i)
+	{
+		nano::node_config config (24000 + i, system.logging);
+		system.add_node (config, nano::node_flags (), nano::transport::transport_type::udp);	
+	}
+
 	nano::keypair key2;
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	system.wallet (1)->insert_adhoc (key2.prv);
