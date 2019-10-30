@@ -483,11 +483,13 @@ void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a
 		node.network.tcp_channels.udp_fallback (endpoint_a, callback_a);
 		return;
 	}
+	static std::vector<std::shared_ptr<nano::socket>> sockets;
 	auto socket (std::make_shared<nano::socket> (node.shared_from_this (), boost::none, nano::socket::concurrency::multi_writer));
+	sockets.push_back (socket);
 	auto channel (std::make_shared<nano::transport::channel_tcp> (node, socket->weak_from_this ()));
 	std::weak_ptr<nano::node> node_w (node.shared ());
 	socket->async_connect (nano::transport::map_endpoint_to_tcp (endpoint_a),
-	[node_w,  channel, socket, endpoint_a, callback_a](boost::system::error_code const & ec) {
+	[node_w,  channel, socket_w=socket->weak_from_this (), endpoint_a, callback_a](boost::system::error_code const & ec) {
 		if (auto node_l = node_w.lock ())
 		{
 			if (!ec && channel)
@@ -502,12 +504,12 @@ void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a
 				}
 				std::shared_ptr<std::vector<uint8_t>> receive_buffer (std::make_shared<std::vector<uint8_t>> ());
 				receive_buffer->resize (256);
-				channel->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel, socket, endpoint_a, receive_buffer, callback_a](boost::system::error_code const & ec, size_t size_a) {
+				channel->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel, socket_w, endpoint_a, receive_buffer, callback_a](boost::system::error_code const & ec, size_t size_a) {
 					if (auto node_l = node_w.lock ())
 					{
 						if (!ec && channel)
 						{
-							node_l->network.tcp_channels.start_tcp_receive_node_id (channel, socket, endpoint_a, receive_buffer, callback_a);
+							node_l->network.tcp_channels.start_tcp_receive_node_id (channel, socket_w.lock (), endpoint_a, receive_buffer, callback_a);
 						}
 						else
 						{
@@ -531,7 +533,7 @@ void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a
 void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<nano::transport::channel_tcp> channel_a,  std::shared_ptr<nano::socket> socket_a, nano::endpoint const & endpoint_a, std::shared_ptr<std::vector<uint8_t>> receive_buffer_a, std::function<void(std::shared_ptr<nano::transport::channel>)> const & callback_a)
 {
 	std::weak_ptr<nano::node> node_w (node.shared ());
-	socket_a->async_read (receive_buffer_a, 8 + sizeof (nano::account) + sizeof (nano::account) + sizeof (nano::signature), [node_w, channel_a, socket_a, endpoint_a, receive_buffer_a, callback_a](boost::system::error_code const & ec, size_t size_a) {
+	socket_a->async_read (receive_buffer_a, 8 + sizeof (nano::account) + sizeof (nano::account) + sizeof (nano::signature), [node_w, channel_a, socket_w = socket_a->weak_from_this (), endpoint_a, receive_buffer_a, callback_a](boost::system::error_code const & ec, size_t size_a) {
 		if (auto node_l = node_w.lock ())
 		{
 			if (!ec && channel_a)
@@ -569,7 +571,7 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 							{
 								node_l->logger.try_log (boost::str (boost::format ("Node ID handshake response sent with node ID %1% to %2%: query %3%") % node_l->node_id.pub.to_node_id () % endpoint_a % (*message.query).to_string ()));
 							}
-							channel_a->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel_a, socket_a, endpoint_a, callback_a](boost::system::error_code const & ec, size_t size_a) {
+							channel_a->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel_a, socket_w, endpoint_a, callback_a](boost::system::error_code const & ec, size_t size_a) {
 								if (auto node_l = node_w.lock ())
 								{
 									if (!ec && channel_a)
@@ -582,7 +584,7 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 											callback_a (channel_a);
 										}
 										// Listen for possible responses
-										auto response_server = std::make_shared<nano::bootstrap_server> (socket_a, node_l);
+										auto response_server = std::make_shared<nano::bootstrap_server> (socket_w.lock (), node_l);
 										response_server->type = nano::bootstrap_server_type::realtime_response_server;
 										response_server->remote_node_id = channel_a->get_node_id ();
 										node_l->network.tcp_channels.insert (response_server);
