@@ -23,7 +23,7 @@ namespace transport
 		friend class nano::transport::tcp_channels;
 
 	public:
-		channel_tcp (nano::node &, std::shared_ptr<nano::socket>);
+		channel_tcp (nano::node &, std::weak_ptr<nano::socket>);
 		~channel_tcp ();
 		size_t hash_code () const override;
 		bool operator== (nano::transport::channel const &) const override;
@@ -33,18 +33,17 @@ namespace transport
 		std::string to_string () const override;
 		bool operator== (nano::transport::channel_tcp const & other_a) const
 		{
-			return &node == &other_a.node && socket == other_a.socket;
+			return &node == &other_a.node && socket.lock () == other_a.socket.lock ();
 		}
-		std::shared_ptr<nano::socket> socket;
-		std::shared_ptr<nano::bootstrap_server> response_server;
+		std::weak_ptr<nano::socket> socket;
 		bool server{ false };
 
 		nano::endpoint get_endpoint () const override
 		{
 			nano::lock_guard<std::mutex> lk (channel_mutex);
-			if (socket)
+			if (auto socket_l = socket.lock ())
 			{
-				return nano::transport::map_tcp_to_endpoint (socket->remote_endpoint ());
+				return nano::transport::map_tcp_to_endpoint (socket_l->remote_endpoint ());
 			}
 			else
 			{
@@ -55,9 +54,9 @@ namespace transport
 		nano::tcp_endpoint get_tcp_endpoint () const override
 		{
 			nano::lock_guard<std::mutex> lk (channel_mutex);
-			if (socket)
+			if (auto socket_l = socket.lock ())
 			{
-				return socket->remote_endpoint ();
+				return socket_l->remote_endpoint ();
 			}
 			else
 			{
@@ -77,6 +76,7 @@ namespace transport
 	public:
 		tcp_channels (nano::node &);
 		bool insert (std::shared_ptr<nano::transport::channel_tcp>);
+		void insert (std::shared_ptr<nano::bootstrap_server> const &);
 		void erase (nano::tcp_endpoint const &);
 		size_t size () const;
 		std::shared_ptr<nano::transport::channel_tcp> find_channel (nano::tcp_endpoint const &) const;
@@ -105,6 +105,7 @@ namespace transport
 		void start_tcp_receive_node_id (std::shared_ptr<nano::transport::channel_tcp>, nano::endpoint const &, std::shared_ptr<std::vector<uint8_t>>, std::function<void(std::shared_ptr<nano::transport::channel>)> const &);
 		void udp_fallback (nano::endpoint const &, std::function<void(std::shared_ptr<nano::transport::channel>)> const &);
 		nano::node & node;
+		std::vector<std::shared_ptr<nano::socket>> sockets;
 
 	private:
 		class endpoint_tag
@@ -169,6 +170,7 @@ namespace transport
 		boost::multi_index::ordered_non_unique<boost::multi_index::tag<last_packet_sent_tag>, boost::multi_index::const_mem_fun<channel_tcp_wrapper, std::chrono::steady_clock::time_point, &channel_tcp_wrapper::last_packet_sent>>,
 		boost::multi_index::ordered_non_unique<boost::multi_index::tag<ip_address_tag>, boost::multi_index::const_mem_fun<channel_tcp_wrapper, boost::asio::ip::address, &channel_tcp_wrapper::ip_address>>>>
 		channels;
+		std::vector<std::shared_ptr<nano::bootstrap_server>> bootstrap_servers;
 		boost::multi_index_container<
 		tcp_endpoint_attempt,
 		boost::multi_index::indexed_by<
