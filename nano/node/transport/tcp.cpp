@@ -19,12 +19,6 @@ nano::transport::channel_tcp::~channel_tcp ()
 			socket_l->close ();
 		}
 	}
-	// Remove response server
-	if (response_server != nullptr)
-	{
-		response_server->stop ();
-		response_server = nullptr;
-	}
 }
 
 size_t nano::transport::channel_tcp::hash_code () const
@@ -338,12 +332,6 @@ void nano::transport::tcp_channels::stop ()
 		{
 			socket_l->close ();
 		}
-		// Remove response server
-/*		if (i->channel->response_server != nullptr)
-		{
-			i->channel->response_server->stop ();
-			i->channel->response_server = nullptr;
-		}*/
 	}
 	channels.clear ();
 	for (auto server : bootstrap_servers)
