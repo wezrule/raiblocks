@@ -33,7 +33,7 @@ namespace transport
 		std::string to_string () const override;
 		bool operator== (nano::transport::channel_tcp const & other_a) const
 		{
-			return &node == &other_a.node && socket == other_a.socket;
+			return &node == &other_a.node && socket.lock () == other_a.socket.lock ();
 		}
 		std::weak_ptr<nano::socket> socket;
 		bool server{ false };
