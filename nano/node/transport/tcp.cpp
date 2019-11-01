@@ -336,8 +336,6 @@ void nano::transport::tcp_channels::stop ()
 		if (i->response_server)
 		{
 			i->response_server->stop ();
-//			channels.modify ()
-//			i->response_server->mo = nullptr;
 		}
 	}
 	channels.clear ();
@@ -474,6 +472,16 @@ void nano::transport::tcp_channels::update (nano::tcp_endpoint const & endpoint_
 	}
 }
 
+void nano::transport::tcp_channels::remove_temp_socket (std::shared_ptr<nano::socket> socket_a)
+{
+	std::weak_ptr<nano::node> node_w (node.shared ());
+	if (auto node_l = node_w.lock ())
+	{
+		std::lock_guard <std::mutex> guard (mutex);
+		temp_sockets.erase (std::remove (temp_sockets.begin (), temp_sockets.end (), socket_a), temp_sockets.end ());
+	}
+}
+
 void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a, std::function<void(std::shared_ptr<nano::transport::channel>)> const & callback_a)
 {
 	if (node.flags.disable_tcp_realtime)
@@ -513,8 +521,7 @@ void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a
 						{
 							if (auto socket_l = channel->socket.lock ())
 							{
-								auto & temp_sockets = node_l->network.tcp_channels.temp_sockets;
-								temp_sockets.erase (std::remove (temp_sockets.begin (), temp_sockets.end (), socket_l), temp_sockets.end ());
+								node_l->network.tcp_channels.remove_temp_socket (socket_l);
 							}
 							if (node_l->config.logging.network_node_id_handshake_logging ())
 							{
@@ -538,24 +545,19 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 	std::weak_ptr<nano::node> node_w (node.shared ());
 	if (auto socket_l = channel_a->socket.lock ())
 	{
-		auto cleanup_temp_socket = [](std::shared_ptr<nano::socket> socket_a, std::shared_ptr<nano::node> node_a) {
-			auto & temp_sockets = node_a->network.tcp_channels.temp_sockets;
-			temp_sockets.erase (std::remove (temp_sockets.begin (), temp_sockets.end (), socket_a), temp_sockets.end ());
-		};
-
-		auto cleanup_and_udp_fallback = [socket_w = channel_a->socket, node_w, cleanup_temp_socket](nano::endpoint const & endpoint_a, std::function<void(std::shared_ptr<nano::transport::channel>)> const & callback_a) {
+		auto cleanup_and_udp_fallback = [socket_w = channel_a->socket, node_w](nano::endpoint const & endpoint_a, std::function<void(std::shared_ptr<nano::transport::channel>)> const & callback_a) {
 			if (auto node_l = node_w.lock ())
 			{
 				node_l->network.tcp_channels.udp_fallback (endpoint_a, callback_a);
 
 				if (auto socket_l = socket_w.lock ())
 				{
-					cleanup_temp_socket (socket_l, node_l);
+					node_l->network.tcp_channels.remove_temp_socket (socket_l);
 				}
 			}
 		};
 
-		socket_l->async_read (receive_buffer_a, 8 + sizeof (nano::account) + sizeof (nano::account) + sizeof (nano::signature), [node_w, channel_a, endpoint_a, receive_buffer_a, callback_a, cleanup_temp_socket, cleanup_and_udp_fallback](boost::system::error_code const & ec, size_t size_a) {
+		socket_l->async_read (receive_buffer_a, 8 + sizeof (nano::account) + sizeof (nano::account) + sizeof (nano::signature), [node_w, channel_a, endpoint_a, receive_buffer_a, callback_a, cleanup_and_udp_fallback](boost::system::error_code const & ec, size_t size_a) {
 			if (auto node_l = node_w.lock ())
 			{
 				if (!ec && channel_a)
@@ -593,7 +595,7 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 								{
 									node_l->logger.try_log (boost::str (boost::format ("Node ID handshake response sent with node ID %1% to %2%: query %3%") % node_l->node_id.pub.to_node_id () % endpoint_a % (*message.query).to_string ()));
 								}
-								channel_a->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel_a, endpoint_a, callback_a, cleanup_temp_socket, cleanup_and_udp_fallback](boost::system::error_code const & ec, size_t size_a) {
+								channel_a->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel_a, endpoint_a, callback_a, cleanup_and_udp_fallback](boost::system::error_code const & ec, size_t size_a) {
 									if (auto node_l = node_w.lock ())
 									{
 										if (!ec && channel_a)
@@ -612,7 +614,7 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 												response_server->type = nano::bootstrap_server_type::realtime_response_server;
 												response_server->remote_node_id = channel_a->get_node_id ();
 												response_server->receive ();
-												cleanup_temp_socket (socket_l, node_l);
+												node_l->network.tcp_channels.remove_temp_socket (socket_l);
 											}
 										}
 										else

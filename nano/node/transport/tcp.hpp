@@ -104,6 +104,7 @@ namespace transport
 		void start_tcp (nano::endpoint const &, std::function<void(std::shared_ptr<nano::transport::channel>)> const & = nullptr);
 		void start_tcp_receive_node_id (std::shared_ptr<nano::transport::channel_tcp>, nano::endpoint const &, std::shared_ptr<std::vector<uint8_t>>, std::function<void(std::shared_ptr<nano::transport::channel>)> const &);
 		void udp_fallback (nano::endpoint const &, std::function<void(std::shared_ptr<nano::transport::channel>)> const &);
+		void remove_temp_socket (std::shared_ptr<nano::socket> socket_a);
 		nano::node & node;
 
 	private:
@@ -177,6 +178,7 @@ namespace transport
 		boost::multi_index::hashed_unique<boost::multi_index::member<tcp_endpoint_attempt, nano::tcp_endpoint, &tcp_endpoint_attempt::endpoint>>,
 		boost::multi_index::ordered_non_unique<boost::multi_index::member<tcp_endpoint_attempt, std::chrono::steady_clock::time_point, &tcp_endpoint_attempt::last_attempt>>>>
 		attempts;
+		// This holds sockets until they are added
 		std::vector<std::shared_ptr<nano::socket>> temp_sockets;
 		std::atomic<bool> stopped{ false };
 	};
