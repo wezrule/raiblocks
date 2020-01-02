@@ -306,7 +306,7 @@ void nano::election::clear_blocks ()
 	}
 }
 
-void nano::election::insert_inactive_votes_cache ()
+size_t nano::election::insert_inactive_votes_cache ()
 {
 	auto winner_hash (status.winner->hash ());
 	auto cache (node.active.find_inactive_votes_cache (winner_hash));
@@ -328,4 +328,5 @@ void nano::election::insert_inactive_votes_cache ()
 		}
 		confirm_if_quorum ();
 	}
+	return cache.voters.size ();
 }

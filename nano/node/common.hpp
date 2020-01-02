@@ -337,6 +337,7 @@ public:
 	uint64_t cemented_count{ 0 };
 	uint64_t unchecked_count{ 0 };
 	uint64_t account_count{ 0 };
+	uint64_t average_cached_votes{ 0 };
 	uint64_t bandwidth_cap{ 0 };
 	uint64_t uptime{ 0 };
 	uint32_t peer_count{ 0 };

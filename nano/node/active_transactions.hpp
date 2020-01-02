@@ -156,6 +156,7 @@ public:
 	void add_dropped_elections_cache (nano::qualified_root const &);
 	std::chrono::steady_clock::time_point find_dropped_elections_cache (nano::qualified_root const &);
 	size_t dropped_elections_cache_size ();
+	boost::circular_buffer<size_t> cached_votes_cb{ 1000 };
 
 private:
 	// Call action with confirmed block, may be different than what we started with
