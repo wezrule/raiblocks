@@ -1147,6 +1147,7 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 	nano::uint128_t unchecked_sum{ 0 };
 	nano::uint128_t uptime_sum{ 0 };
 	nano::uint128_t bandwidth_sum{ 0 };
+	nano::uint128_t average_cached_votes_sum{ 0 };
 
 	std::unordered_map<uint8_t, int> protocol_versions;
 	std::unordered_map<uint8_t, int> vendor_versions;
@@ -1164,6 +1165,7 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 		protocol_sum += telemetry_data.protocol_version_number;
 		++protocol_versions[telemetry_data.protocol_version_number];
 		peer_sum += telemetry_data.peer_count;
+		average_cached_votes_sum += telemetry_data.average_cached_votes;
 
 		// 0 has a special meaning (unlimited), don't include it in the average as it will be heavily skewed
 		if (telemetry_data.bandwidth_cap != 0)
@@ -1183,6 +1185,7 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 	consolidated_data.peer_count = boost::numeric_cast<decltype (peer_count)> (peer_sum / size);
 	consolidated_data.uptime = boost::numeric_cast<decltype (uptime)> (uptime_sum / size);
 	consolidated_data.unchecked_count = boost::numeric_cast<decltype (unchecked_count)> (unchecked_sum / size);
+	consolidated_data.average_cached_votes = boost::numeric_cast<decltype (average_cached_votes)> (average_cached_votes_sum / size);
 
 	auto set_mode_or_average = [](auto const & collection, auto & var, auto const & sum, size_t size) {
 		auto max = std::max_element (collection.begin (), collection.end (), [](auto const & lhs, auto const & rhs) {

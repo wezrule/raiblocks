@@ -678,7 +678,8 @@ bool nano::active_transactions::add (std::shared_ptr<nano::block> block_a, bool 
 			roots.get<tag_root> ().emplace (nano::conflict_info{ root, difficulty, difficulty, election });
 			blocks.insert (std::make_pair (hash, election));
 			adjust_difficulty (hash);
-			election->insert_inactive_votes_cache ();
+			auto inserted_votes (election->insert_inactive_votes_cache ());
+			cached_votes_cb.push_back (inserted_votes);
 		}
 	}
 	return error;

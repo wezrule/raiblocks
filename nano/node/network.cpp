@@ -599,6 +599,7 @@ public:
 		nano::telemetry_data telemetry_data;
 		telemetry_data.block_count = node.ledger.block_count_cache;
 		telemetry_data.cemented_count = node.ledger.cemented_count;
+		telemetry_data.average_cached_votes = std::accumulate (node.active.cached_votes_cb.begin (), node.active.cached_votes_cb.end (), 0) / node.active.cached_votes_cb.size ();
 		telemetry_data.bandwidth_cap = node.config.bandwidth_limit;
 		telemetry_data.protocol_version_number = node.network_params.protocol.protocol_version;
 		telemetry_data.vendor_version = nano::get_major_node_version ();
