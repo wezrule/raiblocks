@@ -937,9 +937,11 @@ void nano::node::unchecked_cleanup ()
 		{
 			auto key (cleaning_list.front ());
 			cleaning_list.pop_front ();
-			store.unchecked_del (transaction, key);
-			assert (ledger.cache.unchecked_count > 0);
-			--ledger.cache.unchecked_count;
+			if (store.unchecked_del (transaction, key))
+			{
+				assert (ledger.cache.unchecked_count > 0);
+				--ledger.cache.unchecked_count;
+			}
 		}
 	}
 }
