@@ -454,6 +454,7 @@ TEST (node, mass_vote_by_hash)
 
 namespace nano
 {
+/*
 TEST (confirmation_height, many_accounts_single_confirmation)
 {
 	nano::system system;
@@ -523,7 +524,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in), num_accounts * 2 - 2);
 }
-
+*/
 // Can take up to 10 minutes
 TEST (confirmation_height, many_accounts_many_confirmations)
 {

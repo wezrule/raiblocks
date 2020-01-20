@@ -1,7 +1,6 @@
 #pragma once
 
 #include <nano/lib/numbers.hpp>
-#include <nano/node/active_transactions.hpp>
 #include <nano/secure/blockstore.hpp>
 #include <nano/secure/common.hpp>
 
@@ -13,67 +12,113 @@
 namespace nano
 {
 class ledger;
-class active_transactions;
 class read_transaction;
 class logger_mt;
 class write_database_queue;
 
-class pending_confirmation_height
+class confirmation_height_processor final
 {
-public:
-	size_t size ();
+public: // TODO: Don't make it all public obviously..
+	confirmation_height_processor (nano::ledger &, nano::write_database_queue &, std::chrono::milliseconds, nano::logger_mt &);
+	~confirmation_height_processor ();
+	void pause ();
+	void unpause ();
+	void stop ();
+	void add (nano::block_hash const & hash_a);
+	void run ();
+
+	size_t pending_size ();
 	bool is_processing_block (nano::block_hash const &);
 	nano::block_hash current ();
 
-private:
+class callback_data final
+{
+public:
+	callback_data (std::shared_ptr<nano::block> const & block_a, nano::block_sideband const & sideband_a);
+	std::shared_ptr<nano::block> block;
+	nano::block_sideband sideband;
+};
+
+class top_hash final
+{
+public:
+	nano::block_hash top;
+	boost::optional<nano::block_hash> next;
+};
+
+class confirmed_info
+{
+public:
+	confirmed_info (uint64_t confirmed_height_a, nano::block_hash const & iterated_frontier);
+	uint64_t confirmed_height; // Can be determined from iterated_frontier though (-1)
+	nano::block_hash iterated_frontier;
+};
+
+std::unordered_map<account, confirmed_info> confirmed;
+std::atomic<uint64_t> confirmed_size{ 0 };
+
+class conf_height_details final
+{
+public:
+	conf_height_details (nano::account const &, nano::block_hash const &, uint64_t, nano::block_hash const &, boost::optional<nano::block_hash>);
+	nano::account account;
+	nano::block_hash hash;
+	uint64_t num_blocks_confirmed;
+	nano::block_hash top_level; // Used to be top_most_level
+	boost::optional<nano::block_hash> next;
+};
+
+class preparation_data final
+{
+public:
+	nano::transaction const & transaction;
+	nano::block_hash const & top_most_send_block;
+	bool already_cemented;
+	boost::circular_buffer_space_optimized<nano::block_hash> & checkpoints;
+	decltype (confirmed.begin ()) account_it;
+	nano::confirmation_height_info const & confirmation_height_info;
+	nano::account const & account;
+	uint64_t num_contiguous_non_receive_blocks;
+	nano::block_hash const & bottom_most;
+	boost::optional<conf_height_details> & receive_details;
+	boost::optional<top_hash> & next_in_receive_chain;
+};
+
 	std::mutex mutex;
 	std::unordered_set<nano::block_hash> pending;
+	std::vector<std::function<void(callback_data)>> cemented_observers;
 	/** This is the last block popped off the confirmation height pending collection */
-	nano::block_hash current_hash{ 0 };
+	nano::block_hash original_hash{ 0 };
 	friend class confirmation_height_processor;
 	friend class confirmation_height_pending_observer_callbacks_Test;
 	friend class confirmation_height_dependent_election_Test;
 	friend class confirmation_height_dependent_election_after_already_cemented_Test;
-};
 
-std::unique_ptr<container_info_component> collect_container_info (pending_confirmation_height &, const std::string &);
+	void add_cemented_observer (std::function<void(callback_data)> const &);
 
-class confirmation_height_processor final
-{
-public:
-	confirmation_height_processor (pending_confirmation_height &, nano::ledger &, nano::active_transactions &, nano::write_database_queue &, std::chrono::milliseconds, nano::logger_mt &);
-	~confirmation_height_processor ();
-	void add (nano::block_hash const &);
-	void stop ();
-	void pause ();
-	void unpause ();
+	nano::ledger & ledger;
+	nano::logger_mt & logger;
+	nano::condition_variable condition;
+	std::atomic<bool> stopped{ false };
+	std::atomic<bool> paused{ false };
+	nano::write_database_queue & write_database_queue;
+	std::chrono::milliseconds batch_separate_pending_min_time;
+	nano::timer<std::chrono::milliseconds> timer;
 
 	/** The maximum amount of accounts to iterate over while writing */
-	static uint64_t constexpr batch_write_size = 2048;
+	static uint64_t constexpr batch_block_write_size = 2; // batch_write_size = 2; // 2048;
 
 	/** The maximum number of blocks to be read in while iterating over a long account chain */
 	static uint64_t constexpr batch_read_size = 4096;
 
-private:
-	class callback_data final
+	class write_details final
 	{
 	public:
-		callback_data (std::shared_ptr<nano::block> const &, nano::block_sideband const &, nano::election_status_type);
-		std::shared_ptr<nano::block> block;
-		nano::block_sideband sideband;
-		nano::election_status_type election_status_type;
-	};
-
-	class conf_height_details final
-	{
-	public:
-		conf_height_details (nano::account const &, nano::block_hash const &, uint64_t, uint64_t, std::vector<callback_data> const &);
-
+		write_details (nano::account const &, uint64_t, nano::block_hash const &);
 		nano::account account;
-		nano::block_hash hash;
-		uint64_t height;
 		uint64_t num_blocks_confirmed;
-		std::vector<callback_data> block_callbacks_required;
+		// This is the first block hash (boittom most) which is not cemented
+		nano::block_hash start_hash;
 	};
 
 	class receive_source_pair final
@@ -85,40 +130,27 @@ private:
 		nano::block_hash source_hash;
 	};
 
-	class confirmed_iterated_pair
-	{
-	public:
-		confirmed_iterated_pair (uint64_t confirmed_height_a, uint64_t iterated_height_a);
-		uint64_t confirmed_height;
-		uint64_t iterated_height;
-	};
+	bool cement_blocks ();
 
-	nano::condition_variable condition;
-	nano::pending_confirmation_height & pending_confirmations;
-	std::atomic<bool> stopped{ false };
-	std::atomic<bool> paused{ false };
-	nano::ledger & ledger;
-	nano::active_transactions & active;
-	nano::logger_mt & logger;
-	std::atomic<uint64_t> receive_source_pairs_size{ 0 };
-	std::vector<receive_source_pair> receive_source_pairs;
+	static uint32_t const max_accounts {2}; // or max blocks?
 
-	std::deque<conf_height_details> pending_writes;
-	// Store the highest confirmation heights for accounts in pending_writes to reduce unnecessary iterating,
-	// and iterated height to prevent iterating over the same blocks more than once from self-sends or "circular" sends between the same accounts.
-	std::unordered_map<account, confirmed_iterated_pair> confirmed_iterated_pairs;
-	nano::timer<std::chrono::milliseconds> timer;
-	nano::write_database_queue & write_database_queue;
-	std::chrono::milliseconds batch_separate_pending_min_time;
+	std::deque<write_details> pending_writes;
+	std::atomic<uint64_t> pending_writes_size{ 0 };
+	static uint32_t constexpr pending_writes_max_size { max_accounts };
+
+
 	std::thread thread;
 
-	void run ();
-	void add_confirmation_height (nano::block_hash const &);
-	void collect_unconfirmed_receive_and_sources_for_account (uint64_t, uint64_t, nano::block_hash const &, nano::account const &, nano::read_transaction const &, std::vector<callback_data> &);
-	bool write_pending (std::deque<conf_height_details> &);
-
 	friend std::unique_ptr<container_info_component> collect_container_info (confirmation_height_processor &, const std::string &);
-	friend class confirmation_height_pending_observer_callbacks_Test;
+
+private:
+	top_hash get_next_block (boost::optional<top_hash> const &, boost::circular_buffer_space_optimized<nano::block_hash> const &, boost::circular_buffer_space_optimized<receive_source_pair> const & receive_source_pairs, boost::optional<conf_height_details> &);
+	nano::block_hash get_least_unconfirmed_hash_from_top_level (nano::transaction const &, nano::block_hash const &, nano::account const &, nano::confirmation_height_info const &, uint64_t);
+	void notify_observers (std::vector<callback_data> const & cemented_blocks);
+	void prepare_iterated_blocks_for_cementing (preparation_data const &);
+	void set_next_hash ();
+	void process ();
+	bool iterate (nano::read_transaction const &, nano::block_hash const & start_hash_a, uint64_t &, boost::circular_buffer_space_optimized<nano::block_hash> &, nano::block_hash &, nano::block_hash const &, boost::circular_buffer_space_optimized<receive_source_pair> &, nano::account const &);
 };
 
 std::unique_ptr<container_info_component> collect_container_info (confirmation_height_processor &, const std::string &);

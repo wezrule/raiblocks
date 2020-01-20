@@ -34,6 +34,7 @@ class block_sideband;
 class election;
 class vote;
 class transaction;
+class confirmation_height_processor;
 
 class conflict_info final
 {
@@ -72,7 +73,7 @@ class active_transactions final
 	// clang-format on
 
 public:
-	explicit active_transactions (nano::node &);
+	explicit active_transactions (nano::node &, nano::confirmation_height_processor &);
 	~active_transactions ();
 	// Start an election for a block
 	// Call action with confirmed block, may be different than what we started with
@@ -96,7 +97,7 @@ public:
 	void stop ();
 	bool publish (std::shared_ptr<nano::block> block_a);
 	boost::optional<nano::election_status_type> confirm_block (nano::transaction const &, std::shared_ptr<nano::block>);
-	void post_confirmation_height_set (nano::transaction const & transaction_a, std::shared_ptr<nano::block> block_a, nano::block_sideband const & sideband_a, nano::election_status_type election_status_type_a);
+	void block_cemented_callback (std::shared_ptr<nano::block> const & block_a, nano::block_sideband const & sideband_a);
 	// clang-format off
 	boost::multi_index_container<nano::conflict_info,
 	mi::indexed_by<
@@ -114,6 +115,7 @@ public:
 	void add_inactive_votes_cache (nano::block_hash const &, nano::account const &);
 	nano::gap_information find_inactive_votes_cache (nano::block_hash const &);
 	void erase_inactive_votes_cache (nano::block_hash const &);
+	nano::confirmation_height_processor & confirmation_height_processor;
 	nano::node & node;
 	std::mutex mutex;
 	boost::circular_buffer<double> multipliers_cb;
