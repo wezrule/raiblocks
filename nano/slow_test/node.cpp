@@ -454,7 +454,6 @@ TEST (node, mass_vote_by_hash)
 
 namespace nano
 {
-/*
 TEST (confirmation_height, many_accounts_single_confirmation)
 {
 	nano::system system;
@@ -470,8 +469,8 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	// The number of frontiers should be more than the batch_write_size to test the amount of blocks confirmed is correct.
-	auto num_accounts = nano::confirmation_height_processor::batch_write_size * 2 + 50;
+	// The number of frontiers should be more than the batch_block_write_size to test the amount of blocks confirmed is correct.
+	auto num_accounts = nano::confirmation_height_processor::batch_block_write_size * 2 + 50;
 	nano::keypair last_keypair = nano::test_genesis_key;
 	auto last_open_hash = node->latest (nano::test_genesis_key.pub);
 	{
@@ -498,18 +497,13 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 	}
 
 	system.deadline_set (60s);
-	while (true)
+	auto transaction = node->store.tx_begin_read ();
+	while (!node->ledger.block_confirmed (transaction, last_open_hash))
 	{
-		auto transaction = node->store.tx_begin_read ();
-		if (node->ledger.block_confirmed (transaction, last_open_hash))
-		{
-			break;
-		}
-
 		ASSERT_NO_ERROR (system.poll ());
+		transaction.refresh ();
 	}
 
-	auto transaction (node->store.tx_begin_read ());
 	// All frontiers (except last) should have 2 blocks and both should be confirmed
 	for (auto i (node->store.latest_begin (transaction)), n (node->store.latest_end ()); i != n; ++i)
 	{
@@ -524,7 +518,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in), num_accounts * 2 - 2);
 }
-*/
+
 // Can take up to 10 minutes
 TEST (confirmation_height, many_accounts_many_confirmations)
 {
