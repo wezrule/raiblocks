@@ -560,7 +560,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		node->block_confirm (open_block);
 	}
 
-	system.deadline_set (60s);
+	system.deadline_set (600s);
 	while (node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in) != (num_accounts - 1) * 2)
 	{
 		ASSERT_NO_ERROR (system.poll ());
@@ -630,7 +630,7 @@ TEST (confirmation_height, long_chains)
 	// Call block confirm on the existing receive block on the genesis account which will confirm everything underneath on both accounts
 	node->block_confirm (receive1);
 
-	system.deadline_set (10s);
+	system.deadline_set (100s);
 	while (true)
 	{
 		auto transaction = node->store.tx_begin_read ();
