@@ -19,7 +19,7 @@ ledger (ledger_a),
 logger (logger_a),
 write_database_queue (write_database_queue_a),
 batch_separate_pending_min_time (batch_separate_pending_min_time_a),
-thread ([this] () {
+thread ([this]() {
 	nano::thread_role::set (nano::thread_role::name::confirmation_height_processing);
 	this->run ();
 })
@@ -225,7 +225,7 @@ void nano::confirmation_height_processor::process ()
 			}
 
 			// Accumulate the number of blocks
-			auto total_pending_write_block_count = std::accumulate (pending_writes.cbegin (), pending_writes.cend (), uint64_t (0), [] (uint64_t total, auto const & write_details_a) {
+			auto total_pending_write_block_count = std::accumulate (pending_writes.cbegin (), pending_writes.cend (), uint64_t (0), [](uint64_t total, auto const & write_details_a) {
 				return total += write_details_a.num_blocks_confirmed;
 			});
 
@@ -368,7 +368,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 		}
 	}
 
-	// Add the receive block and all non-receive blocks above that one 
+	// Add the receive block and all non-receive blocks above that one
 	auto & receive_details = preparation_data_a.receive_details;
 	if (receive_details)
 	{
@@ -415,7 +415,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 		{
 			const auto & pending = pending_writes.front ();
 
-			auto write_confirmation_height = [& account = pending.account, &ledger = ledger, &transaction] (uint64_t num_blocks_cemented, uint64_t confirmation_height, nano::block_hash const & confirmed_frontier) {
+			auto write_confirmation_height = [& account = pending.account, &ledger = ledger, &transaction](uint64_t num_blocks_cemented, uint64_t confirmation_height, nano::block_hash const & confirmed_frontier) {
 				ledger.store.confirmation_height_put (transaction, account, nano::confirmation_height_info{ confirmation_height, confirmed_frontier });
 				ledger.cache.cemented_count += num_blocks_cemented;
 				ledger.stats.add (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in, num_blocks_cemented);
@@ -491,13 +491,13 @@ bool nano::confirmation_height_processor::cement_blocks ()
 	return false;
 }
 
-void nano::confirmation_height_processor::add_cemented_observer (std::function<void (callback_data)> const & callback_a)
+void nano::confirmation_height_processor::add_cemented_observer (std::function<void(callback_data)> const & callback_a)
 {
 	nano::lock_guard<std::mutex> guard (mutex);
 	cemented_observers.push_back (callback_a);
 }
 
-void nano::confirmation_height_processor::add_cemented_batch_finished_observer (std::function<void ()> const & callback_a)
+void nano::confirmation_height_processor::add_cemented_batch_finished_observer (std::function<void()> const & callback_a)
 {
 	nano::lock_guard<std::mutex> guard (mutex);
 	cemented_batch_finished_observers.push_back (callback_a);

@@ -38,8 +38,8 @@ public:
 		nano::block_sideband sideband;
 	};
 
-	void add_cemented_observer (std::function<void (callback_data)> const &);
-	void add_cemented_batch_finished_observer (std::function<void ()> const &);
+	void add_cemented_observer (std::function<void(callback_data)> const &);
+	void add_cemented_batch_finished_observer (std::function<void()> const &);
 
 	/** The maximum amount of accounts to iterate over while writing */
 	static uint64_t constexpr batch_block_write_size = 4096;
@@ -118,8 +118,8 @@ private:
 	std::unordered_set<nano::block_hash> awaiting_processing;
 	// Hashes which have been added and processed, but have not been cemented
 	std::unordered_set<nano::block_hash> original_hashes_pending;
-	std::vector<std::function<void (callback_data)>> cemented_observers;
-	std::vector<std::function<void ()>> cemented_batch_finished_observers;
+	std::vector<std::function<void(callback_data)>> cemented_observers;
+	std::vector<std::function<void()>> cemented_batch_finished_observers;
 
 	/** This is the last block popped off the confirmation height pending collection */
 	nano::block_hash original_hash{ 0 };
@@ -140,7 +140,7 @@ private:
 
 	bool cement_blocks ();
 
-	static uint32_t constexpr max_items { 65536 };
+	static uint32_t constexpr max_items{ 65536 };
 
 	std::deque<write_details> pending_writes;
 	std::atomic<uint64_t> pending_writes_size{ 0 };

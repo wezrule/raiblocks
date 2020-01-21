@@ -34,12 +34,12 @@ thread ([this]() {
 	// Register a callback which will get called after a block is cemented
 	confirmation_height_processor.add_cemented_observer ([this](nano::confirmation_height_processor::callback_data const & callback_data) {
 		this->block_cemented_callback (callback_data.block, callback_data.sideband);
-	}); 
+	});
 
 	// Register a callback which will get called after a batch of blocks is written and observer calls finished
 	confirmation_height_processor.add_cemented_batch_finished_observer ([this]() {
 		this->cemented_batch_finished_callback ();
-	}); 
+	});
 
 	assert (min_time_between_requests > std::chrono::milliseconds (node.network_params.network.request_interval_ms));
 	assert (min_time_between_floods > std::chrono::milliseconds (node.network_params.network.request_interval_ms));
