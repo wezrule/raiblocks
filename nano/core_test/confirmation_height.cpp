@@ -14,7 +14,6 @@ void add_callback_stats (nano::node & node)
 {
 	node.observers.blocks.add ([& stats = node.stats](nano::election_status const & status_a, nano::account const &, nano::amount const &, bool) {
 		auto s = status_a.winner->hash ().to_string ();
-		//std::cout << "Callback: " << s << std::endl;
 		stats.inc (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out);
 	});
 }
@@ -133,30 +132,6 @@ TEST (confirmation_height, multiple_accounts)
 
 	// The nodes process a live receive which propagates across to all accounts
 	auto receive3 = std::make_shared<nano::receive_block> (open3.hash (), send6.hash (), key3.prv, key3.pub, *system.work.generate (open3.hash ()));
-
-	// TEMP
-	{
-		std::cout << send3.hash ().to_string () << std::endl;
-		std::cout << send2.hash ().to_string () << std::endl;
-		std::cout << send1.hash ().to_string () << std::endl;
-		std::cout << latest1.to_string () << std::endl;
-		std::cout << nano::test_genesis_key.pub.to_account () << std::endl << std::endl;
-
-		std::cout << send5.hash ().to_string () << std::endl;
-		std::cout << send4.hash ().to_string () << std::endl;
-		std::cout << open1.hash ().to_string () << std::endl;
-		std::cout << key1.pub.to_account () << std::endl << std::endl;
-
-		std::cout << receive2.hash ().to_string () << std::endl;
-		std::cout << send6.hash ().to_string () << std::endl;
-		std::cout << receive1.hash ().to_string () << std::endl;
-		std::cout << open2.hash ().to_string () << std::endl;
-		std::cout << key2.pub.to_account () << std::endl << std::endl;
-
-		std::cout << receive3->hash ().to_string () << std::endl;
-		std::cout << open3.hash ().to_string () << std::endl;
-		std::cout << key3.pub.to_account () << std::endl;
-	}
 
 	node->process_active (receive3);
 	node->block_processor.flush ();
@@ -311,20 +286,6 @@ TEST (confirmation_height, gap_live)
 	node1->work_generate_blocking (*receive1);
 	auto receive2 (std::make_shared<nano::receive_block> (receive1->hash (), send3->hash (), destination.prv, destination.pub, 0));
 	node1->work_generate_blocking (*receive2);
-
-//	TEMP
-/*	{
-
-	std::cout << send3->hash ().to_string () << std::endl;
-	std::cout << send2->hash ().to_string () << std::endl;
-	std::cout << send1->hash ().to_string () << std::endl;
-	std::cout << nano::test_genesis_key.pub.to_account () << std::endl << std::endl;
-
-	std::cout << receive2->hash ().to_string () << std::endl;
-	std::cout << receive1->hash ().to_string () << std::endl;
-	std::cout << open1->hash ().to_string () << std::endl;
-	std::cout << destination.pub.to_account () << std::endl << std::endl;
-}*/
 
 	for (auto & node : system.nodes)
 	{
@@ -1089,10 +1050,6 @@ TEST (confirmation_height, dependent_election)
 	auto send1 = std::make_shared<nano::send_block> (send->hash (), key1.pub, nano::genesis_amount - nano::Gxrb_ratio * 2, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (send->hash ()));
 	auto send2 = std::make_shared<nano::send_block> (send1->hash (), key1.pub, nano::genesis_amount - nano::Gxrb_ratio * 3, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (send1->hash ()));
 
-	std::cout << send2->hash ().to_string () << std::endl;
-	std::cout << send1->hash ().to_string () << std::endl;
-	std::cout << send->hash ().to_string () << std::endl;
-
 	{
 		auto transaction = node->store.tx_begin_write ();
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, *send).code);
@@ -1165,10 +1122,6 @@ TEST (confirmation_height, election_winner_details_clearing)
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, *send1).code);
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send2).code);
 	}
-
-	std::cout << send2.hash ().to_string () << std::endl;
-	std::cout << send1->hash ().to_string () << std::endl;
-	std::cout << send->hash ().to_string () << std::endl;
 
 	add_callback_stats (*node);
 

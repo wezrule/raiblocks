@@ -42,7 +42,7 @@ public:
 	void add_cemented_batch_finished_observer (std::function<void ()> const &);
 
 	/** The maximum amount of accounts to iterate over while writing */
-	static uint64_t constexpr batch_block_write_size = 4096; // 2; // 2048;
+	static uint64_t constexpr batch_block_write_size = 4096;
 
 	/** The maximum number of blocks to be read in while iterating over a long account chain */
 	static uint64_t constexpr batch_read_size = 4096;
@@ -140,7 +140,7 @@ private:
 
 	bool cement_blocks ();
 
-	static uint32_t constexpr max_items { 1024 }; // 2000
+	static uint32_t constexpr max_items { 65536 };
 
 	std::deque<write_details> pending_writes;
 	std::atomic<uint64_t> pending_writes_size{ 0 };

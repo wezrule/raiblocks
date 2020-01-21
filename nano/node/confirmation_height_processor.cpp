@@ -200,8 +200,6 @@ void nano::confirmation_height_processor::process ()
 			current = get_least_unconfirmed_hash_from_top_level (transaction, current, account, confirmation_height_info, block_height);
 		}
 
-		auto bottom_most = current;
-
 		uint64_t num_contiguous_non_receive_blocks = 0;
 		auto top_most_non_receive_block_hash = current;
 		bool hit_receive = false;
@@ -214,10 +212,10 @@ void nano::confirmation_height_processor::process ()
 		auto is_set = next_in_receive_chain.is_initialized ();
 		next_in_receive_chain = boost::none;
 
-		// Need to handle case where we are hitting receives where the sends below should be confirmed
-		if (!hit_receive || (receive_source_pairs.size () == 1 && top_most_non_receive_block_hash != bottom_most)) // can this hash be current?
+		// Need to also handle the case where we are hitting receives where the sends below should be confirmed
+		if (!hit_receive || (receive_source_pairs.size () == 1 && top_most_non_receive_block_hash != current))
 		{
-			preparation_data preparation_data{ transaction, top_most_non_receive_block_hash, already_cemented, checkpoints, account_it, confirmation_height_info, account, num_contiguous_non_receive_blocks, bottom_most, receive_details, next_in_receive_chain };
+			preparation_data preparation_data{ transaction, top_most_non_receive_block_hash, already_cemented, checkpoints, account_it, confirmation_height_info, account, num_contiguous_non_receive_blocks, current, receive_details, next_in_receive_chain };
 			prepare_iterated_blocks_for_cementing (preparation_data);
 
 			// If used the top level, don't pop off the receive source pair because it wasn't used
@@ -475,8 +473,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			write_confirmation_height (num_blocks_cemented, confirmation_height, new_cemented_frontier);
 
 			auto it = confirmed.find (pending.account);
-			assert (it != confirmed.cend ());
-			if (it->second.confirmed_height == confirmation_height)
+			if (it != confirmed.cend () && it->second.confirmed_height == confirmation_height)
 			{
 				confirmed.erase (pending.account);
 			}
@@ -566,7 +563,6 @@ size_t nano::confirmation_height_processor::awaiting_processing_size ()
 
 bool nano::confirmation_height_processor::is_processing_block (nano::block_hash const & hash_a)
 {
-	// First check the hash currently being processed
 	nano::lock_guard<std::mutex> guard (mutex);
 	return original_hashes_pending.find (hash_a) != original_hashes_pending.cend () || awaiting_processing.find (hash_a) != awaiting_processing.cend ();
 }
