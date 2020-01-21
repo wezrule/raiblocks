@@ -360,6 +360,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			else
 			{
 				confirmed.emplace (preparation_data_a.account, confirmed_info{ block_height, preparation_data_a.top_most_non_receive_block_hash });
+				confirmed_size = confirmed.size ();
 			}
 
 			preparation_data_a.checkpoints.erase (std::remove (preparation_data_a.checkpoints.begin (), preparation_data_a.checkpoints.end (), preparation_data_a.top_most_non_receive_block_hash), preparation_data_a.checkpoints.end ());
@@ -386,6 +387,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->hash, &sideband);
 			assert (block);
 			confirmed.emplace (receive_details->account, confirmed_info{ sideband.height, receive_details->hash });
+			confirmed_size = confirmed.size ();
 		}
 
 		preparation_data_a.next_in_receive_chain = top_hash{ receive_details->top_level, receive_details->next };
@@ -476,6 +478,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			if (it != confirmed.cend () && it->second.confirmed_height == confirmation_height)
 			{
 				confirmed.erase (pending.account);
+				confirmed_size = confirmed.size ();
 			}
 			pending_writes.pop_front ();
 			--pending_writes_size;
