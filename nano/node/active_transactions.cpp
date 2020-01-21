@@ -38,26 +38,7 @@ thread ([this]() {
 
 	// Register a callback which will get called after a batch of blocks is written and observer calls finished
 	confirmation_height_processor.add_cemented_batch_finished_observer ([this]() {
-
-		// TODO: Make this a function
-
-		// Depending on timing there is a situation where the election_winner_details is not reset.
-		// This can happen when a block wins an election, and the block is confirmed + observer
-		// called before the block hash gets added to election_winner_details. If the block is confirmed
-		// callbacks have already been done, so we can safely just remove it.
-		auto transaction = this->node.store.tx_begin_read ();
-		for (auto it = this->election_winner_details.begin (); it != this->election_winner_details.end ();)
-		{
-			if (this->node.ledger.block_confirmed (transaction, it->first))
-			{
-				//std::cout << it->first.to_string () << std::endl;
-				it = this->election_winner_details.erase (it);
-			}
-			else
-			{
-				++it;
-			}
-		}
+		this->cemented_batch_finished_callback ();
 	}); 
 
 	assert (min_time_between_requests > std::chrono::milliseconds (node.network_params.network.request_interval_ms));
@@ -205,6 +186,27 @@ void nano::active_transactions::block_cemented_callback (std::shared_ptr<nano::b
 
 				election_winner_details.erase (hash);
 			}
+		}
+	}
+}
+
+void nano::active_transactions::cemented_batch_finished_callback ()
+{
+	// Depending on timing there is a situation where the election_winner_details is not reset.
+	// This can happen when a block wins an election, and the block is confirmed + observer
+	// called before the block hash gets added to election_winner_details. If the block is confirmed
+	// callbacks have already been done, so we can safely just remove it.
+	auto transaction = this->node.store.tx_begin_read ();
+	for (auto it = this->election_winner_details.begin (); it != this->election_winner_details.end ();)
+	{
+		if (this->node.ledger.block_confirmed (transaction, it->first))
+		{
+			//std::cout << it->first.to_string () << std::endl;
+			it = this->election_winner_details.erase (it);
+		}
+		else
+		{
+			++it;
 		}
 	}
 }

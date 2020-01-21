@@ -425,7 +425,6 @@ bool nano::confirmation_height_processor::cement_blocks ()
 
 			nano::block_sideband sideband;
 			auto block = ledger.store.block_get (transaction, pending.start_hash, &sideband);
-			std::cout << "Pending: " << pending.start_hash.to_string () << std::endl;
 			auto confirmation_height = sideband.height + pending.num_blocks_confirmed - 1;
 			auto start_height = sideband.height;
 
