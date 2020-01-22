@@ -42,7 +42,7 @@ public:
 	void add_cemented_batch_finished_observer (std::function<void()> const &);
 
 	/** The maximum amount of accounts to iterate over while writing */
-	static uint64_t constexpr batch_block_write_size = 4096;
+	static uint64_t constexpr batch_block_write_size = 2; //4096;
 
 	/** The maximum number of blocks to be read in while iterating over a long account chain */
 	static uint64_t constexpr batch_read_size = 4096;
@@ -123,10 +123,6 @@ private:
 
 	/** This is the last block popped off the confirmation height pending collection */
 	nano::block_hash original_hash{ 0 };
-	friend class confirmation_height_processor;
-	friend class confirmation_height_pending_observer_callbacks_Test;
-	friend class confirmation_height_dependent_election_Test;
-	friend class confirmation_height_dependent_election_after_already_cemented_Test;
 
 	nano::ledger & ledger;
 	nano::logger_mt & logger;
@@ -149,6 +145,9 @@ private:
 	std::thread thread;
 
 	friend std::unique_ptr<container_info_component> collect_container_info (confirmation_height_processor &, const std::string &);
+	friend class confirmation_height_pending_observer_callbacks_Test;
+	friend class confirmation_height_dependent_election_Test;
+	friend class confirmation_height_dependent_election_after_already_cemented_Test;
 
 private:
 	top_hash get_next_block (boost::optional<top_hash> const &, boost::circular_buffer_space_optimized<nano::block_hash> const &, boost::circular_buffer_space_optimized<receive_source_pair> const & receive_source_pairs, boost::optional<conf_height_details> &);

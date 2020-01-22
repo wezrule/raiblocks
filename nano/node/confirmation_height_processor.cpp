@@ -421,12 +421,46 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				ledger.store.confirmation_height_put (transaction, account, nano::confirmation_height_info{ confirmation_height, confirmed_frontier });
 				ledger.cache.cemented_count += num_blocks_cemented;
 				ledger.stats.add (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in, num_blocks_cemented);
+
+				auto account = ledger.store.block_account (transaction, nano::genesis ().hash ());
+				nano::confirmation_height_info confirmation_height_info_l;
+				ledger.store.confirmation_height_get (transaction, account, confirmation_height_info_l);
+
+				auto cemented_count = 0;
+				for (auto i (ledger.store.confirmation_height_begin (transaction)), n (ledger.store.confirmation_height_end ()); i != n; ++i)
+				{
+					cemented_count += i->second.height;
+				}
+
+				// TODO: Something has gone wrong
+				auto count = ledger.cache.cemented_count.load ();
+//				auto count1 = cemented_count;// ledger.conf cemented confirmation_height_count (transaction);
+				if (count != cemented_count)
+				{
+					//int cheese = ledger.cache.cemented_count;
+					std::cout << "pew pew" << std::endl;
+				}
 			};
 
 			nano::block_sideband sideband;
 			auto block = ledger.store.block_get (transaction, pending.start_hash, &sideband);
 			auto confirmation_height = sideband.height + pending.num_blocks_confirmed - 1;
 			auto start_height = sideband.height;
+
+			// TODO: Remove after
+			/*nano::confirmation_height_info confirmation_height_info;
+			auto error = ledger.store.confirmation_height_get (transaction, pending.account, confirmation_height_info);
+			release_assert (!error);
+			if (confirmation_height != confirmation_height_info.height)
+			{
+				std::
+
+				release_assert (false);
+			}
+			*/
+
+
+
 
 			// The highest block which is currently cemented
 			auto new_cemented_frontier = pending.start_hash;
@@ -453,9 +487,8 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				if (cemented_blocks.size () == batch_block_write_size)
 				{
 					auto num_blocks_cemented = num_blocks_iterated - total_blocks_cemented + 1;
-					write_confirmation_height (num_blocks_cemented, start_height + num_blocks_cemented - 1, new_cemented_frontier);
 					total_blocks_cemented += num_blocks_cemented;
-
+					write_confirmation_height (num_blocks_cemented, start_height + total_blocks_cemented - 1, new_cemented_frontier);
 					transaction.commit ();
 					notify_observers (cemented_blocks);
 					cemented_blocks.clear ();
@@ -475,6 +508,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			write_confirmation_height (num_blocks_cemented, confirmation_height, new_cemented_frontier);
 
 			auto it = confirmed.find (pending.account);
+			assert (it != confirmed.cend ());
 			if (it != confirmed.cend () && it->second.confirmed_height == confirmation_height)
 			{
 				confirmed.erase (pending.account);
