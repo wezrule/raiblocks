@@ -513,7 +513,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 		nano::confirmation_height_info confirmation_height_info;
 		ASSERT_FALSE (node->store.confirmation_height_get (transaction, account, confirmation_height_info));
 		ASSERT_EQ (count, confirmation_height_info.height);
-		ASSERT_FALSE (confirmation_height_info.height, node->ledger.cache.cemented_count);
+		ASSERT_EQ (confirmation_height_info.height, node->ledger.cache.cemented_count);
 		ASSERT_EQ (count, account_info.block_count);
 	}
 
@@ -650,7 +650,7 @@ TEST (confirmation_height, long_chains)
 	nano::confirmation_height_info confirmation_height_info;
 	ASSERT_FALSE (node->store.confirmation_height_get (transaction, nano::test_genesis_key.pub, confirmation_height_info));
 	ASSERT_EQ (num_blocks + 2, confirmation_height_info.height);
-	ASSERT_FALSE (confirmation_height_info.height, node->ledger.cache.cemented_count);
+	ASSERT_EQ (confirmation_height_info.height, node->ledger.cache.cemented_count);
 	ASSERT_EQ (num_blocks + 3, account_info.block_count); // Includes the unpocketed send
 
 	ASSERT_FALSE (node->store.account_get (transaction, key1.pub, account_info));
