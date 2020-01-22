@@ -422,7 +422,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				ledger.cache.cemented_count += num_blocks_cemented;
 				ledger.stats.add (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in, num_blocks_cemented);
 
-				auto account = ledger.store.block_account (transaction, nano::genesis ().hash ());
+//				auto account = ledger.store.block_account (transaction, nano::genesis ().hash ());
 				nano::confirmation_height_info confirmation_height_info_l;
 				ledger.store.confirmation_height_get (transaction, account, confirmation_height_info_l);
 
