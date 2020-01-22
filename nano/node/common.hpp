@@ -344,13 +344,14 @@ public:
 	uint8_t protocol_version_number{ 0 };
 	uint8_t vendor_version{ 0 };
 	nano::block_hash genesis_block{ 0 };
+	boost::optional<uint64_t> cheese;
 
-	static nano::telemetry_data consolidate (std::vector<nano::telemetry_data> const & current_telemetry_data_responses);
+	static nano::telemetry_data consolidate (std::vector<nano::telemetry_data> const & telemetry_data_responses_a);
 	nano::error serialize_json (nano::jsonconfig & json) const;
 	nano::error deserialize_json (nano::jsonconfig & json);
 	bool operator== (nano::telemetry_data const &) const;
 
-	static auto constexpr size = sizeof (block_count) + sizeof (cemented_count) + sizeof (unchecked_count) + sizeof (account_count) + sizeof (bandwidth_cap) + sizeof (peer_count) + sizeof (protocol_version_number) + sizeof (vendor_version) + sizeof (uptime) + sizeof (genesis_block);
+	static auto constexpr size = sizeof (block_count) + sizeof (cemented_count) + sizeof (unchecked_count) + sizeof (account_count) + sizeof (bandwidth_cap) + sizeof (peer_count) + sizeof (protocol_version_number) + sizeof (vendor_version) + sizeof (uptime) + sizeof (genesis_block) + sizeof (decltype(cheese)::value_type);
 };
 class telemetry_req final : public message
 {

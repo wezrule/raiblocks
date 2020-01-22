@@ -1090,6 +1090,7 @@ data (telemetry_data_a)
 
 void nano::telemetry_ack::serialize (nano::stream & stream_a) const
 {
+	assert (header.extensions.to_ulong () == nano::telemetry_data::size);
 	header.serialize (stream_a);
 	write (stream_a, data.block_count);
 	write (stream_a, data.cemented_count);
@@ -1101,6 +1102,7 @@ void nano::telemetry_ack::serialize (nano::stream & stream_a) const
 	write (stream_a, data.vendor_version);
 	write (stream_a, data.uptime);
 	write (stream_a, data.genesis_block.bytes);
+	write (stream_a, *data.cheese);
 }
 
 bool nano::telemetry_ack::deserialize (nano::stream & stream_a)
@@ -1118,6 +1120,13 @@ bool nano::telemetry_ack::deserialize (nano::stream & stream_a)
 		read (stream_a, data.vendor_version);
 		read (stream_a, data.uptime);
 		read (stream_a, data.genesis_block.bytes);
+
+		if (header.extensions.to_ulong () > 86)
+		{
+			uint64_t cheese_l;
+			read (stream_a, cheese_l);
+			data.cheese = cheese_l;
+		}
 	}
 	catch (std::runtime_error const &)
 	{
@@ -1137,16 +1146,16 @@ uint16_t nano::telemetry_ack::size (nano::message_header const & message_header_
 	return static_cast<uint16_t> (message_header_a.extensions.to_ulong ());
 }
 
-nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::telemetry_data> const & current_telemetry_data_responses)
+nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::telemetry_data> const & telemetry_data_responses_a)
 {
-	if (current_telemetry_data_responses.empty ())
+	if (telemetry_data_responses_a.empty ())
 	{
 		return {};
 	}
-	else if (current_telemetry_data_responses.size () == 1)
+	else if (telemetry_data_responses_a.size () == 1)
 	{
 		// Only 1 element in the collection, so just return it.
-		return current_telemetry_data_responses.front ();
+		return telemetry_data_responses_a.front ();
 	}
 
 	nano::uint128_t account_sum{ 0 };
@@ -1156,6 +1165,7 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 	nano::uint128_t unchecked_sum{ 0 };
 	nano::uint128_t uptime_sum{ 0 };
 	nano::uint128_t bandwidth_sum{ 0 };
+	nano::uint128_t cheese_sum{ 0 };
 
 	std::unordered_map<uint8_t, int> protocol_versions;
 	std::unordered_map<uint8_t, int> vendor_versions;
@@ -1164,7 +1174,7 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 
 	nano::uint128_t account_average{ 0 };
 
-	for (auto const & telemetry_data : current_telemetry_data_responses)
+	for (auto const & telemetry_data : telemetry_data_responses_a)
 	{
 		account_sum += telemetry_data.account_count;
 		block_sum += telemetry_data.block_count;
@@ -1172,6 +1182,7 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 		++vendor_versions[telemetry_data.vendor_version];
 		++protocol_versions[telemetry_data.protocol_version_number];
 		peer_sum += telemetry_data.peer_count;
+		cheese_sum += 1;
 
 		// 0 has a special meaning (unlimited), don't include it in the average as it will be heavily skewed
 		if (telemetry_data.bandwidth_cap != 0)
@@ -1185,13 +1196,16 @@ nano::telemetry_data nano::telemetry_data::consolidate (std::vector<nano::teleme
 	}
 
 	nano::telemetry_data consolidated_data;
-	auto size = current_telemetry_data_responses.size ();
+	auto size = telemetry_data_responses_a.size ();
 	consolidated_data.account_count = boost::numeric_cast<decltype (account_count)> (account_sum / size);
 	consolidated_data.block_count = boost::numeric_cast<decltype (block_count)> (block_sum / size);
 	consolidated_data.cemented_count = boost::numeric_cast<decltype (cemented_count)> (cemented_sum / size);
 	consolidated_data.peer_count = boost::numeric_cast<decltype (peer_count)> (peer_sum / size);
 	consolidated_data.uptime = boost::numeric_cast<decltype (uptime)> (uptime_sum / size);
 	consolidated_data.unchecked_count = boost::numeric_cast<decltype (unchecked_count)> (unchecked_sum / size);
+
+	// TODO:
+	consolidated_data.cheese = boost::numeric_cast<decltype (cheese)::value_type> (cheese_sum / size);
 
 	auto set_mode_or_average = [](auto const & collection, auto & var, auto const & sum, size_t size) {
 		auto max = std::max_element (collection.begin (), collection.end (), [](auto const & lhs, auto const & rhs) {
@@ -1243,6 +1257,10 @@ nano::error nano::telemetry_data::serialize_json (nano::jsonconfig & json) const
 	json.put ("vendor_version", vendor_version);
 	json.put ("uptime", uptime);
 	json.put ("genesis_block", genesis_block.to_string ());
+	if (cheese.is_initialized ())
+	{
+		json.put ("cheese", *cheese);
+	}
 	return json.get_error ();
 }
 
@@ -1266,12 +1284,17 @@ nano::error nano::telemetry_data::deserialize_json (nano::jsonconfig & json)
 			json.get_error ().set ("Could not deserialize genesis block");
 		}
 	}
+	auto opt = json.get_optional<uint64_t> ("cheese");
+	if (opt.is_initialized ())
+	{
+		cheese = *opt;
+	}
 	return json.get_error ();
 }
 
 bool nano::telemetry_data::operator== (nano::telemetry_data const & data_a) const
 {
-	return (block_count == data_a.block_count && cemented_count == data_a.cemented_count && unchecked_count == data_a.unchecked_count && account_count == data_a.account_count && bandwidth_cap == data_a.bandwidth_cap && uptime == data_a.uptime && peer_count == data_a.peer_count && protocol_version_number == data_a.protocol_version_number && vendor_version == data_a.vendor_version && genesis_block == data_a.genesis_block);
+	return (block_count == data_a.block_count && cemented_count == data_a.cemented_count && unchecked_count == data_a.unchecked_count && account_count == data_a.account_count && bandwidth_cap == data_a.bandwidth_cap && uptime == data_a.uptime && peer_count == data_a.peer_count && protocol_version_number == data_a.protocol_version_number && vendor_version == data_a.vendor_version && genesis_block == data_a.genesis_block && cheese == data_a.cheese);
 }
 
 nano::node_id_handshake::node_id_handshake (bool & error_a, nano::stream & stream_a, nano::message_header const & header_a) :
