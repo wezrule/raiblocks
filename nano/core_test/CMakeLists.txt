@@ -1,11 +1,14 @@
 add_executable (core_test
 	core_test_main.cc
 	testutil.hpp
+	fakes/work_peer.hpp
 	active_transactions.cpp
 	block.cpp
 	block_store.cpp
 	bootstrap.cpp
+	cli.cpp
 	confirmation_height.cpp
+	confirmation_solicitor.cpp
 	conflicts.cpp
 	difficulty.cpp
 	distributed_work.cpp
@@ -16,15 +19,15 @@ add_executable (core_test
 	ledger.cpp
 	locks.cpp
 	logger.cpp
-	network.cpp
-	node.cpp
 	message.cpp
 	message_parser.cpp
 	memory_pool.cpp
 	network.cpp
+	node.cpp
 	node_telemetry.cpp
 	processor_service.cpp
 	peer_container.cpp
+	request_aggregator.cpp
 	signing.cpp
 	socket.cpp
 	toml.cpp

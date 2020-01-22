@@ -110,9 +110,11 @@ std::shared_ptr<nano::node> add_ipc_enabled_node (nano::system & system)
 void reset_confirmation_height (nano::block_store & store, nano::account const & account)
 {
 	auto transaction = store.tx_begin_write ();
-	uint64_t confirmation_height;
-	store.confirmation_height_get (transaction, account, confirmation_height);
-	store.confirmation_height_clear (transaction, account, confirmation_height);
+	nano::confirmation_height_info confirmation_height_info;
+	if (!store.confirmation_height_get (transaction, account, confirmation_height_info))
+	{
+		store.confirmation_height_clear (transaction, account, confirmation_height_info.height);
+	}
 }
 
 void check_block_response_count (nano::system & system, nano::rpc & rpc, boost::property_tree::ptree & request, uint64_t size_count)
@@ -1309,7 +1311,7 @@ TEST (rpc, frontier)
 			nano::block_hash hash;
 			nano::random_pool::generate_block (hash.bytes.data (), hash.bytes.size ());
 			source[key.pub] = hash;
-			node->store.confirmation_height_put (transaction, key.pub, 0);
+			node->store.confirmation_height_put (transaction, key.pub, { 0, nano::block_hash (0) });
 			node->store.account_put (transaction, key.pub, nano::account_info (hash, 0, 0, 0, 0, 0, nano::epoch::epoch_0));
 		}
 	}
@@ -1360,7 +1362,7 @@ TEST (rpc, frontier_limited)
 			nano::block_hash hash;
 			nano::random_pool::generate_block (hash.bytes.data (), hash.bytes.size ());
 			source[key.pub] = hash;
-			node->store.confirmation_height_put (transaction, key.pub, 0);
+			node->store.confirmation_height_put (transaction, key.pub, { 0, nano::block_hash (0) });
 			node->store.account_put (transaction, key.pub, nano::account_info (hash, 0, 0, 0, 0, 0, nano::epoch::epoch_0));
 		}
 	}
@@ -1402,7 +1404,7 @@ TEST (rpc, frontier_startpoint)
 			nano::block_hash hash;
 			nano::random_pool::generate_block (hash.bytes.data (), hash.bytes.size ());
 			source[key.pub] = hash;
-			node->store.confirmation_height_put (transaction, key.pub, 0);
+			node->store.confirmation_height_put (transaction, key.pub, { 0, nano::block_hash (0) });
 			node->store.account_put (transaction, key.pub, nano::account_info (hash, 0, 0, 0, 0, 0, nano::epoch::epoch_0));
 		}
 	}
@@ -4873,7 +4875,7 @@ TEST (rpc, account_info)
 	auto time (nano::seconds_since_epoch ());
 	{
 		auto transaction = node1.store.tx_begin_write ();
-		node1.store.confirmation_height_put (transaction, nano::test_genesis_key.pub, 1);
+		node1.store.confirmation_height_put (transaction, nano::test_genesis_key.pub, { 1, genesis.hash () });
 	}
 	scoped_thread_name_io.renew ();
 
@@ -4901,6 +4903,8 @@ TEST (rpc, account_info)
 		ASSERT_EQ ("2", block_count);
 		std::string confirmation_height (response.json.get<std::string> ("confirmation_height"));
 		ASSERT_EQ ("1", confirmation_height);
+		std::string confirmation_height_frontier (response.json.get<std::string> ("confirmation_height_frontier"));
+		ASSERT_EQ (genesis.hash ().to_string (), confirmation_height_frontier);
 		ASSERT_EQ (0, response.json.get<uint8_t> ("account_version"));
 		boost::optional<std::string> weight (response.json.get_optional<std::string> ("weight"));
 		ASSERT_FALSE (weight.is_initialized ());
@@ -7076,7 +7080,7 @@ TEST (rpc, database_txn_tracker)
 	request.put ("min_read_time", "1000");
 	test_response response (request, rpc.config.port, system.io_ctx);
 	// It can take a long time to generate stack traces
-	system.deadline_set (30s);
+	system.deadline_set (60s);
 	while (response.status == 0)
 	{
 		ASSERT_NO_ERROR (system.poll ());
@@ -7753,21 +7757,21 @@ TEST (rpc, receive_work_disabled)
 
 namespace
 {
-	void compare_default_test_result_data (test_response & response, nano::node const & node_server_a)
-	{
-		ASSERT_EQ (200, response.status);
-		ASSERT_FALSE (response.json.get<bool> ("cached"));
-		ASSERT_EQ (1, response.json.get<uint64_t> ("block_count"));
-		ASSERT_EQ (1, response.json.get<uint64_t> ("cemented_count"));
-		ASSERT_EQ (0, response.json.get<uint64_t> ("unchecked_count"));
-		ASSERT_EQ (1, response.json.get<uint64_t> ("account_count"));
-		ASSERT_EQ (node_server_a.config.bandwidth_limit, response.json.get<uint64_t> ("bandwidth_cap"));
-		ASSERT_EQ (1, response.json.get<uint32_t> ("peer_count"));
-		ASSERT_EQ (node_server_a.network_params.protocol.protocol_version, response.json.get<uint8_t> ("protocol_version_number"));
-		ASSERT_EQ (nano::get_major_node_version (), response.json.get<uint8_t> ("vendor_version"));
-		ASSERT_GE (100, response.json.get<uint64_t> ("uptime"));
-		ASSERT_EQ (nano::genesis ().hash ().to_string (), response.json.get<std::string> ("genesis_block"));
-	}
+void compare_default_test_result_data (test_response & response, nano::node const & node_server_a)
+{
+	ASSERT_EQ (200, response.status);
+	ASSERT_FALSE (response.json.get<bool> ("cached"));
+	ASSERT_EQ (1, response.json.get<uint64_t> ("block_count"));
+	ASSERT_EQ (1, response.json.get<uint64_t> ("cemented_count"));
+	ASSERT_EQ (0, response.json.get<uint64_t> ("unchecked_count"));
+	ASSERT_EQ (1, response.json.get<uint64_t> ("account_count"));
+	ASSERT_EQ (node_server_a.config.bandwidth_limit, response.json.get<uint64_t> ("bandwidth_cap"));
+	ASSERT_EQ (1, response.json.get<uint32_t> ("peer_count"));
+	ASSERT_EQ (node_server_a.network_params.protocol.protocol_version, response.json.get<uint8_t> ("protocol_version_number"));
+	ASSERT_EQ (nano::get_major_node_version (), response.json.get<uint8_t> ("vendor_version"));
+	ASSERT_GE (100, response.json.get<uint64_t> ("uptime"));
+	ASSERT_EQ (nano::genesis ().hash ().to_string (), response.json.get<std::string> ("genesis_block"));
+}
 }
 
 TEST (rpc, node_telemetry_single)
@@ -7793,10 +7797,39 @@ TEST (rpc, node_telemetry_single)
 		peers_stored = system.nodes.back ()->store.peer_count (transaction) != 0;
 	}
 
-	// First try with invalid address
+	// Missing port
 	boost::property_tree::ptree request;
 	auto node = system.nodes.front ();
 	request.put ("action", "node_telemetry");
+	request.put ("address", "not_a_valid_address");
+
+	{
+		test_response response (request, rpc.config.port, system.io_ctx);
+		system.deadline_set (10s);
+		while (response.status == 0)
+		{
+			ASSERT_NO_ERROR (system.poll ());
+		}
+		ASSERT_EQ (200, response.status);
+		ASSERT_EQ (std::error_code (nano::error_rpc::requires_port_and_address).message (), response.json.get<std::string> ("error"));
+	}
+
+	// Missing address
+	request.erase ("address");
+	request.put ("port", 65);
+
+	{
+		test_response response (request, rpc.config.port, system.io_ctx);
+		system.deadline_set (10s);
+		while (response.status == 0)
+		{
+			ASSERT_NO_ERROR (system.poll ());
+		}
+		ASSERT_EQ (200, response.status);
+		ASSERT_EQ (std::error_code (nano::error_rpc::requires_port_and_address).message (), response.json.get<std::string> ("error"));
+	}
+
+	// Try with invalid address
 	request.put ("address", "not_a_valid_address");
 	request.put ("port", 65);
 
@@ -7812,7 +7845,7 @@ TEST (rpc, node_telemetry_single)
 	}
 
 	// Then invalid port
-	request.put ("address", (boost::format ("%1%") % node->network.endpoint ().address ()).str ()); 
+	request.put ("address", (boost::format ("%1%") % node->network.endpoint ().address ()).str ());
 	request.put ("port", "invalid port");
 	{
 		test_response response (request, rpc.config.port, system.io_ctx);

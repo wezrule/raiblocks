@@ -227,7 +227,7 @@ nano::account_info nano::json_handler::account_info_impl (nano::transaction cons
 		if (node.store.account_get (transaction_a, account_a, result))
 		{
 			ec = nano::error_common::account_not_found;
-			node.bootstrap_initiator.bootstrap_lazy (account_a, false, false);
+			node.bootstrap_initiator.bootstrap_lazy (account_a, false, false, account_a.to_account ());
 		}
 	}
 	return result;
@@ -534,8 +534,8 @@ void nano::json_handler::account_info ()
 		const bool pending = request.get<bool> ("pending", false);
 		auto transaction (node.store.tx_begin_read ());
 		auto info (account_info_impl (transaction, account));
-		uint64_t confirmation_height;
-		if (node.store.confirmation_height_get (transaction, account, confirmation_height))
+		nano::confirmation_height_info confirmation_height_info;
+		if (node.store.confirmation_height_get (transaction, account, confirmation_height_info))
 		{
 			ec = nano::error_common::account_not_found;
 		}
@@ -550,7 +550,8 @@ void nano::json_handler::account_info ()
 			response_l.put ("modified_timestamp", std::to_string (info.modified));
 			response_l.put ("block_count", std::to_string (info.block_count));
 			response_l.put ("account_version", epoch_as_string (info.epoch ()));
-			response_l.put ("confirmation_height", std::to_string (confirmation_height));
+			response_l.put ("confirmation_height", std::to_string (confirmation_height_info.height));
+			response_l.put ("confirmation_height_frontier", confirmation_height_info.frontier.to_string ());
 			if (representative)
 			{
 				response_l.put ("representative", info.representative.to_account ());
@@ -1599,7 +1600,8 @@ void nano::json_handler::bootstrap ()
 		{
 			if (!node.flags.disable_legacy_bootstrap)
 			{
-				node.bootstrap_initiator.bootstrap (nano::endpoint (address, port), true, bypass_frontier_confirmation);
+				std::string bootstrap_id (request.get<std::string> ("id", ""));
+				node.bootstrap_initiator.bootstrap (nano::endpoint (address, port), true, bypass_frontier_confirmation, bootstrap_id);
 				response_l.put ("success", "");
 			}
 			else
@@ -1624,7 +1626,8 @@ void nano::json_handler::bootstrap_any ()
 	const bool force = request.get<bool> ("force", false);
 	if (!node.flags.disable_legacy_bootstrap)
 	{
-		node.bootstrap_initiator.bootstrap (force);
+		std::string bootstrap_id (request.get<std::string> ("id", ""));
+		node.bootstrap_initiator.bootstrap (force, bootstrap_id);
 		response_l.put ("success", "");
 	}
 	else
@@ -1642,7 +1645,8 @@ void nano::json_handler::bootstrap_lazy ()
 	{
 		if (!node.flags.disable_lazy_bootstrap)
 		{
-			node.bootstrap_initiator.bootstrap_lazy (hash, force);
+			std::string bootstrap_id (request.get<std::string> ("id", ""));
+			node.bootstrap_initiator.bootstrap_lazy (hash, force, true, bootstrap_id);
 			response_l.put ("started", "1");
 		}
 		else
@@ -1663,6 +1667,7 @@ void nano::json_handler::bootstrap_status ()
 	{
 		nano::lock_guard<std::mutex> lock (attempt->mutex);
 		nano::lock_guard<std::mutex> lazy_lock (attempt->lazy_mutex);
+		response_l.put ("id", attempt->id);
 		response_l.put ("clients", std::to_string (attempt->clients.size ()));
 		response_l.put ("pulls", std::to_string (attempt->pulls.size ()));
 		response_l.put ("pulling", std::to_string (attempt->pulling));
@@ -1674,20 +1679,7 @@ void nano::json_handler::bootstrap_status ()
 		response_l.put ("requeued_pulls", std::to_string (attempt->requeued_pulls));
 		response_l.put ("frontiers_received", static_cast<bool> (attempt->frontiers_received));
 		response_l.put ("frontiers_confirmed", static_cast<bool> (attempt->frontiers_confirmed));
-		std::string mode_text;
-		if (attempt->mode == nano::bootstrap_mode::legacy)
-		{
-			mode_text = "legacy";
-		}
-		else if (attempt->mode == nano::bootstrap_mode::lazy)
-		{
-			mode_text = "lazy";
-		}
-		else if (attempt->mode == nano::bootstrap_mode::wallet_lazy)
-		{
-			mode_text = "wallet_lazy";
-		}
-		response_l.put ("mode", mode_text);
+		response_l.put ("mode", attempt->mode_text ());
 		response_l.put ("lazy_blocks", std::to_string (attempt->lazy_blocks.size ()));
 		response_l.put ("lazy_state_backlog", std::to_string (attempt->lazy_state_backlog.size ()));
 		response_l.put ("lazy_balances", std::to_string (attempt->lazy_balances.size ()));
@@ -1775,7 +1767,7 @@ void nano::json_handler::confirmation_height_currently_processing ()
 	auto hash = node.pending_confirmation_height.current ();
 	if (!hash.is_zero ())
 	{
-		response_l.put ("hash", node.pending_confirmation_height.current ().to_string ());
+		response_l.put ("hash", hash.to_string ());
 	}
 	else
 	{
@@ -3915,60 +3907,69 @@ void nano::json_handler::telemetry ()
 	auto address_text (request.get_optional<std::string> ("address"));
 	auto port_text (request.get_optional<std::string> ("port"));
 
-	if (address_text.is_initialized () && port_text.is_initialized ())
+	if (address_text.is_initialized () || port_text.is_initialized ())
 	{
-		uint16_t port;
-		if (!nano::parse_port (*port_text, port))
+		// Check both are specified
+		if (address_text.is_initialized () && port_text.is_initialized ())
 		{
-			boost::system::error_code address_ec;
-			auto address (boost::asio::ip::make_address_v6 (*address_text, address_ec));
-			if (!address_ec)
+			uint16_t port;
+			if (!nano::parse_port (*port_text, port))
 			{
-				nano::endpoint endpoint (address, port);
-				auto channel = node.network.find_channel (endpoint);
-				if (channel)
+				boost::system::error_code address_ec;
+				auto address (boost::asio::ip::make_address_v6 (*address_text, address_ec));
+				if (!address_ec)
 				{
-					node.telemetry.get_single_metric_async (channel, [rpc_l](auto const & single_telemetry_metric_a) {
-					
-						if (!single_telemetry_metric_a.error)
-						{
-							nano::jsonconfig config_l;
-							auto err = single_telemetry_metric_a.data.serialize_json (config_l);
-							auto const & ptree = config_l.get_tree ();
-
-							if (!err)
+					nano::endpoint endpoint (address, port);
+					auto channel = node.network.find_channel (endpoint);
+					if (channel)
+					{
+						node.telemetry.get_metrics_single_peer_async (channel, [rpc_l](auto const & single_telemetry_metric_a) {
+							if (!single_telemetry_metric_a.error)
 							{
-								rpc_l->response_l.insert (rpc_l->response_l.begin (), ptree.begin (), ptree.end ());
-								rpc_l->response_l.put ("cached", single_telemetry_metric_a.is_cached);
+								nano::jsonconfig config_l;
+								auto err = single_telemetry_metric_a.data.serialize_json (config_l);
+								auto const & ptree = config_l.get_tree ();
+
+								if (!err)
+								{
+									rpc_l->response_l.insert (rpc_l->response_l.begin (), ptree.begin (), ptree.end ());
+									rpc_l->response_l.put ("cached", single_telemetry_metric_a.is_cached);
+								}
+								else
+								{
+									rpc_l->ec = nano::error_rpc::generic;
+								}
 							}
 							else
 							{
 								rpc_l->ec = nano::error_rpc::generic;
-							}				
-						}
-						else
-						{
-							rpc_l->ec = nano::error_rpc::generic;
-						}
+							}
 
-
-						rpc_l->response_errors ();	
-					});
+							rpc_l->response_errors ();
+						});
+					}
+					else
+					{
+						ec = nano::error_rpc::peer_not_found;
+						response_errors ();
+					}
 				}
 				else
 				{
-					ec = nano::error_rpc::peer_not_found;
+					ec = nano::error_common::invalid_ip_address;
+					response_errors ();
 				}
 			}
 			else
 			{
-				ec = nano::error_common::invalid_ip_address;
+				ec = nano::error_common::invalid_port;
+				response_errors ();
 			}
-
 		}
 		else
 		{
-			ec = nano::error_common::invalid_port;
+			ec = nano::error_rpc::requires_port_and_address;
+			response_errors ();
 		}
 	}
 	else
@@ -3977,7 +3978,7 @@ void nano::json_handler::telemetry ()
 		// setting "raw" to true returns metrics from all nodes requested.
 		auto raw = request.get_optional<bool> ("raw");
 		auto output_raw = raw.is_initialized () ? *raw : false;
-		node.telemetry.get_random_metrics_async ([rpc_l, output_raw](auto const & batched_telemetry_metrics_a) {
+		node.telemetry.get_metrics_random_peers_async ([rpc_l, output_raw](auto const & batched_telemetry_metrics_a) {
 			if (output_raw)
 			{
 				boost::property_tree::ptree metrics;
@@ -4017,11 +4018,6 @@ void nano::json_handler::telemetry ()
 			rpc_l->response_l.put ("cached", batched_telemetry_metrics_a.is_cached);
 			rpc_l->response_errors ();
 		});
-	}
-
-	if (ec)
-	{
-		response_errors ();	
 	}
 }
 
