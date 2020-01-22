@@ -180,6 +180,8 @@ TEST (node_telemetry, many_nodes)
 		system.add_node (node_config);
 	}
 
+	wait_all_peers (system);
+
 	// Give all nodes a non-default number of blocks
 	nano::keypair key;
 	nano::genesis genesis;
@@ -202,7 +204,7 @@ TEST (node_telemetry, many_nodes)
 		done = true;
 	});
 
-	system.deadline_set (10s);
+	system.deadline_set (20s);
 	while (!done)
 	{
 		ASSERT_NO_ERROR (system.poll ());
