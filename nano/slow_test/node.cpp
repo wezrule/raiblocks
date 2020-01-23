@@ -543,7 +543,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	auto num_accounts = 10000; // 7; // TODO
+	auto num_accounts = nano::confirmation_height_processor::batch_block_write_size * 2 + 50; // 10000; // 7; // TODO
 	auto latest_genesis = node->latest (nano::test_genesis_key.pub);
 	std::vector<std::shared_ptr<nano::open_block>> open_blocks;
 	{
@@ -555,18 +555,18 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 
 			nano::send_block send (latest_genesis, key.pub, node->config.online_weight_minimum.number (), nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest_genesis));
 			ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send).code);
-			std::cout << send.hash ().to_string () << std::endl;
+			//std::cout << send.hash ().to_string () << std::endl;
 			auto open = std::make_shared<nano::open_block> (send.hash (), nano::test_genesis_key.pub, key.pub, key.prv, key.pub, *system.work.generate (key.pub));
 			ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, *open).code);
 			open_blocks.push_back (std::move (open));
 			latest_genesis = send.hash ();
 		}
-		std::cout << std::endl;
+		//std::cout << std::endl;
 	}
 
 	for (auto & open_block : open_blocks)
 	{
-		std::cout << open_block->hash ().to_string () << std::endl <<std::endl;
+		//std::cout << open_block->hash ().to_string () << std::endl <<std::endl;
 	}
 
 
@@ -663,7 +663,7 @@ TEST (confirmation_height, long_chains)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	constexpr auto num_blocks = 10000;
+	constexpr auto num_blocks = nano::confirmation_height_processor::batch_block_write_size * 2 + 50; // 10000;
 
 	// First open the other account
 	nano::send_block send (latest, key1.pub, nano::genesis_amount - nano::Gxrb_ratio + num_blocks + 1, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest));
@@ -761,7 +761,7 @@ TEST (confirmation_height, prioritize_frontiers_overwrite)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	auto num_accounts = node->active.max_priority_cementable_frontiers * 2;
+	auto num_accounts = node->active.max_priority_cementable_frontiers * 2 + 50;
 	nano::keypair last_keypair = nano::test_genesis_key;
 	auto last_open_hash = node->latest (nano::test_genesis_key.pub);
 	// Clear confirmation height so that the genesis account has the same amount of uncemented blocks as the other frontiers
