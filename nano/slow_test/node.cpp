@@ -526,6 +526,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 	ASSERT_EQ (cemented_count, count);
 
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in), num_accounts * 2 - 2);
+	ASSERT_EQ (node->ledger.cache.cemented_count, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
 }
 
 // Can take up to 10 minutes
@@ -572,6 +573,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 
 
 	system.deadline_set (10s);
+	/*
 	node->confirmation_height_processor.add (open_blocks[0]->hash ());
 	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
 	{
@@ -606,7 +608,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
 	{
 		ASSERT_NO_ERROR (system.poll ());
-	}
+	}*/
 
 
 	// Confirm all of the accounts
@@ -617,17 +619,17 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 //	node->block_confirm (open_blocks[4]);
 //	node->block_confirm (open_blocks[5]);
 
-/*
+
 	for (auto & open_block : open_blocks)
 	{
-//		node->block_confirm (open_block);
+		node->block_confirm (open_block);
 
-		node->confirmation_height_processor.add (open_block->hash ());
+		//node->confirmation_height_processor.add (open_block->hash ());
 		//while (node->confirmation_height_processor.awaiting_processing_size () != 0)
 		//{
 		//	ASSERT_NO_ERROR (system.poll ());
 		//}
-	}*/
+	}
 
 	system.deadline_set (600s);
 	while (node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in) != (num_accounts - 1) * 2)
@@ -644,6 +646,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 
 	auto count = node->ledger.cache.cemented_count.load ();
 	ASSERT_EQ (cemented_count, count);
+	ASSERT_EQ (node->ledger.cache.cemented_count, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
 }
 
 TEST (confirmation_height, long_chains)
@@ -744,8 +747,8 @@ TEST (confirmation_height, long_chains)
 	auto count = node->ledger.cache.cemented_count.load ();
 	ASSERT_EQ (cemented_count, count);
 
-
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in), num_blocks * 2 + 2);
+	ASSERT_EQ (node->ledger.cache.cemented_count, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
 }
 
 // Can take up to 1 hour
