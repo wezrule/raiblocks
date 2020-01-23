@@ -209,6 +209,13 @@ void nano::confirmation_height_processor::process ()
 			hit_receive = iterate (transaction, current, num_contiguous_non_receive_blocks, checkpoints, top_most_non_receive_block_hash, top_level_hash, receive_source_pairs, account);
 		}
 
+		// Exit early when the processor has been stopped, otherwise this function may take a
+		// while (and hence keep the process running) if updating a long chain.
+		if (stopped)
+		{
+			break;
+		}
+
 		// next_in_receive_chain can be modified when writing, so need to cache it here before resetting
 		auto is_set = next_in_receive_chain.is_initialized ();
 		next_in_receive_chain = boost::none;
@@ -277,7 +284,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 	bool hit_receive = false;
 	auto hash = start_hash_a;
 	nano::block_sideband sideband;
-	while (!hash.is_zero () && !reached_target)
+	while (!hash.is_zero () && !reached_target && !stopped)
 	{
 		// Keep iterating going up until we either reach the desired block or a receive the
 		auto block = ledger.store.block_get (transaction_a, hash, &sideband);
