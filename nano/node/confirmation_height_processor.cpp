@@ -426,7 +426,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				ledger.cache.cemented_count += num_blocks_cemented;
 				ledger.stats.add (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in, num_blocks_cemented);
 
-//				auto account = ledger.store.block_account (transaction, nano::genesis ().hash ());
+				/*
 				nano::confirmation_height_info confirmation_height_info_l;
 				ledger.store.confirmation_height_get (transaction, account, confirmation_height_info_l);
 
@@ -435,15 +435,15 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				{
 					cemented_count += i->second.height;
 				}
-
+				*/
 				// TODO: Something has gone wrong
-				auto count = ledger.cache.cemented_count.load ();
+				//auto count = ledger.cache.cemented_count.load ();
 //				auto count1 = cemented_count;// ledger.conf cemented confirmation_height_count (transaction);
-				if (count != cemented_count)
-				{
+				//if (count != cemented_count)
+				//{
 					//int cheese = ledger.cache.cemented_count;
 					//std::cout << "pew pew" << std::endl;
-				}
+				//}
 			};
 
 			nano::block_sideband sideband;

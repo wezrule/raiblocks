@@ -85,7 +85,7 @@ private:
 		nano::block_hash const & top_most_non_receive_block_hash;
 		bool already_cemented;
 		boost::circular_buffer_space_optimized<nano::block_hash> & checkpoints;
-		decltype (accounts_confirmed_info .begin ()) account_it;
+		decltype (accounts_confirmed_info.begin ()) account_it;
 		nano::confirmation_height_info const & confirmation_height_info;
 		nano::account const & account;
 		uint64_t num_contiguous_non_receive_blocks;
