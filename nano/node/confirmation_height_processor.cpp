@@ -359,6 +359,16 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 		auto next{ !sideband.successor.is_zero () ? boost::optional<nano::block_hash> (sideband.successor) : boost::none };
 		auto last_receive_block_details = receive_source_pairs_a.back ().receive_details;
 		last_receive_block_details.num_blocks_confirmed = num_contiguous_non_receive_blocks_above_first_receive + 1;
+
+		// TODO:
+		/*nano::block_sideband sideband1;
+		auto block = ledger.store.block_get (transaction_a, last_receive_block_details.hash, &sideband1);
+		if (sideband1.height != last_receive_block_details. receive_account_it->second.confirmed_height)
+		{
+			bool cheese = false;
+		}*/
+
+
 		last_receive_block_details.next = next;
 	}
 
@@ -408,17 +418,19 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 		if (receive_account_it != accounts_confirmed_info.cend ())
 		{
 			auto current_height = receive_account_it->second.confirmed_height;
-			receive_details->num_blocks_confirmed = receive_details->num_blocks_confirmed;
-			receive_account_it->second.confirmed_height = current_height + receive_details->num_blocks_confirmed;
-			receive_account_it->second.iterated_frontier = receive_details->hash;
+//			receive_details->num_blocks_confirmed = receive_details->num_blocks_confirmed;
 
 			// TODO:
 			nano::block_sideband sideband1;
-			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_account_it->second.iterated_frontier, &sideband1);
-			if (sideband1.height != receive_account_it->second.confirmed_height)
+			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->hash, &sideband1);
+			if (sideband1.height != current_height + receive_details->num_blocks_confirmed)
 			{
 				bool cheese = false;
 			}
+
+			
+			receive_account_it->second.confirmed_height = current_height + receive_details->num_blocks_confirmed;
+			receive_account_it->second.iterated_frontier = receive_details->hash;
 		}
 		else
 		{
