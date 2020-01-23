@@ -41,8 +41,8 @@ public:
 	void add_cemented_observer (std::function<void(callback_data)> const &);
 	void add_cemented_batch_finished_observer (std::function<void()> const &);
 
-	/** The maximum amount of accounts to iterate over while writing */
-	static uint64_t constexpr batch_block_write_size = 4096;
+	/** The maximum amount of blocks to iterate over while writing */
+	static uint64_t constexpr batch_write_size = 4096;
 
 	/** The maximum number of blocks to be read in while iterating over a long account chain */
 	static uint64_t constexpr batch_read_size = 4096;

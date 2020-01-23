@@ -237,7 +237,7 @@ void nano::confirmation_height_processor::process ()
 				return total += write_details_a.num_blocks_confirmed;
 			});
 
-			auto max_batch_write_size_reached = (total_pending_write_block_count >= batch_block_write_size);
+			auto max_batch_write_size_reached = (total_pending_write_block_count >= batch_write_size);
 			// When there are a lot of pending confirmation height blocks, it is more efficient to
 			// bulk some of them up to enable better write performance which becomes the bottleneck.
 			auto min_time_exceeded = (timer.since_start () >= batch_separate_pending_min_time);
@@ -360,7 +360,15 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 	if (!preparation_data_a.already_cemented)
 	{
 		// Add the non-receive blocks iterated for this account
-		auto block_height = (ledger.store.block_account_height (preparation_data_a.transaction, preparation_data_a.top_most_non_receive_block_hash));
+		nano::block_sideband sideband;
+		auto block = ledger.store.block_get (preparation_data_a.transaction, preparation_data_a.top_most_non_receive_block_hash, &sideband);
+		if (!block)
+		{
+			std::cout << "Block not found: " << preparation_data_a.top_most_non_receive_block_hash.to_string () << std::endl;
+		}
+		//TODO: Use: auto block_height = (ledger.store.block_account_height (preparation_data_a.transaction, preparation_data_a.top_most_non_receive_block_hash));
+		auto block_height = sideband.height;
+
 		if (block_height > preparation_data_a.confirmation_height_info.height)
 		{
 			confirmed_info confirmed_info_l{ block_height, preparation_data_a.top_most_non_receive_block_hash };
@@ -415,7 +423,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 
 bool nano::confirmation_height_processor::cement_blocks ()
 {
-	// Will contain all blocks that have been cemented (bounded by batch_block_write_size)
+	// Will contain all blocks that have been cemented (bounded by batch_write_size)
 	// and will get run through the cemented observer callback
 	std::vector<callback_data> cemented_blocks;
 	{
@@ -498,7 +506,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				cemented_blocks.emplace_back (block, sideband);
 
 				// We have likely hit a long chain, flush these callbacks and continue
-				if (cemented_blocks.size () == batch_block_write_size)
+				if (cemented_blocks.size () == batch_write_size)
 				{
 					auto num_blocks_cemented = num_blocks_iterated - total_blocks_cemented + 1;
 					total_blocks_cemented += num_blocks_cemented;
@@ -522,7 +530,12 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			write_confirmation_height (num_blocks_cemented, confirmation_height, new_cemented_frontier);
 
 			auto it = accounts_confirmed_info.find (pending.account);
-			assert (it != accounts_confirmed_info.cend ());
+//			assert (it != accounts_confirmed_info.cend ());
+			if (it == accounts_confirmed_info.cend ())
+			{
+				std::cout << "Pending Account " << pending.account.to_account () << std::endl;
+			}
+
 			if (it != accounts_confirmed_info.cend () && it->second.confirmed_height == confirmation_height)
 			{
 				accounts_confirmed_info.erase (pending.account);
