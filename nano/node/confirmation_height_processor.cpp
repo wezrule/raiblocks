@@ -411,6 +411,13 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			receive_details->num_blocks_confirmed = receive_details->num_blocks_confirmed;
 			receive_account_it->second.confirmed_height = current_height + receive_details->num_blocks_confirmed;
 			receive_account_it->second.iterated_frontier = receive_details->hash;
+
+			// TODO:
+			auto block = ledger.store.block_get (preparation_data_a.transaction, iterated_frontier, &sideband);
+			if (sideband.height != receive_account_it->second)
+			{
+				bool cheese = false;
+			}
 		}
 		else
 		{
@@ -542,12 +549,11 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			write_confirmation_height (num_blocks_cemented, confirmation_height, new_cemented_frontier);
 
 			auto it = accounts_confirmed_info.find (pending.account);
-//			assert (it != accounts_confirmed_info.cend ());
 			if (it == accounts_confirmed_info.cend ())
 			{
 				std::cout << "Pending Account " << pending.account.to_account () << std::endl;
 			}
-
+			assert (it != accounts_confirmed_info.cend ());
 			if (it != accounts_confirmed_info.cend () && it->second.confirmed_height == confirmation_height)
 			{
 				accounts_confirmed_info.erase (pending.account);
