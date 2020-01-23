@@ -188,6 +188,11 @@ void nano::confirmation_height_processor::process ()
 		auto hash_to_process = get_next_block (next_in_receive_chain, checkpoints, receive_source_pairs, receive_details);
 		current = hash_to_process.top;
 
+		if (current.to_string () == "66B75FBA2E8EAC47B53910A9F725ACD74EB21F84D9C7171490F7224BF47BA213")
+		{
+			bool cheese = false;
+		}
+
 		auto top_level_hash = current;
 		nano::account account (ledger.store.block_account (transaction, current));
 		release_assert (!ledger.store.confirmation_height_get (transaction, account, confirmation_height_info));
