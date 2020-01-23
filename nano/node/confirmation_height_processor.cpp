@@ -328,6 +328,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 				{
 					checkpoints_a.push_back (top_level_hash_a);
 				}
+				hash = sideband.successor;
 			}
 		}
 		else

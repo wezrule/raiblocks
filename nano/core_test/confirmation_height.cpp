@@ -740,7 +740,7 @@ TEST (confirmation_height, pending_observer_callbacks)
 	node->confirmation_height_processor.add (send1->hash ());
 
 	system.deadline_set (std::chrono::seconds (10));
-	while (1 != node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out))
+	while (1 != node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out) || 1 != node->ledger.stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out))
 	{
 		ASSERT_NO_ERROR (system.poll ());
 	}
