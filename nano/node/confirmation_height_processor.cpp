@@ -413,7 +413,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			receive_account_it->second.iterated_frontier = receive_details->hash;
 
 			// TODO:
-			auto block = ledger.store.block_get (preparation_data_a.transaction, iterated_frontier, &sideband);
+			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_account_it->second.iterated_frontier, &sideband);
 			if (sideband.height != receive_account_it->second.confirmed_height)
 			{
 				bool cheese = false;
