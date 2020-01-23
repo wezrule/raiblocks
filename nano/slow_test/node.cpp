@@ -545,7 +545,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	auto num_accounts = 7; // TODO
+	auto num_accounts = 10000; // 7; // TODO
 	auto latest_genesis = node->latest (nano::test_genesis_key.pub);
 	std::vector<std::shared_ptr<nano::open_block>> open_blocks;
 	{
