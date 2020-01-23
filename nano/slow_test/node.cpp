@@ -470,7 +470,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 	}
 
 	// The number of frontiers should be more than the batch_block_write_size to test the amount of blocks confirmed is correct.
-	auto num_accounts = nano::confirmation_height_processor::batch_block_write_size * 2 + 50;
+	auto num_accounts = nano::confirmation_height_processor::batch_block_write_size * 2 + 50;// 50;
 	nano::keypair last_keypair = nano::test_genesis_key;
 	auto last_open_hash = node->latest (nano::test_genesis_key.pub);
 	{
@@ -522,11 +522,9 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 		cemented_count += i->second.height;
 	}
 
-	auto count = node->ledger.cache.cemented_count.load ();
-	ASSERT_EQ (cemented_count, count);
-
+	ASSERT_EQ (cemented_count, node->ledger.cache.cemented_count);
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in), num_accounts * 2 - 2);
-	ASSERT_EQ (node->ledger.cache.cemented_count, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
+	ASSERT_EQ (node->ledger.cache.cemented_count - 1, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
 }
 
 // Can take up to 10 minutes
@@ -644,9 +642,8 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		cemented_count += i->second.height;
 	}
 
-	auto count = node->ledger.cache.cemented_count.load ();
-	ASSERT_EQ (cemented_count, count);
-	ASSERT_EQ (node->ledger.cache.cemented_count, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
+	ASSERT_EQ (cemented_count, node->ledger.cache.cemented_count);
+	ASSERT_EQ (node->ledger.cache.cemented_count - 1, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
 }
 
 TEST (confirmation_height, long_chains)
@@ -744,11 +741,9 @@ TEST (confirmation_height, long_chains)
 		cemented_count += i->second.height;
 	}
 
-	auto count = node->ledger.cache.cemented_count.load ();
-	ASSERT_EQ (cemented_count, count);
-
+	ASSERT_EQ (cemented_count, node->ledger.cache.cemented_count);
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in), num_blocks * 2 + 2);
-	ASSERT_EQ (node->ledger.cache.cemented_count, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
+	ASSERT_EQ (node->ledger.cache.cemented_count - 1, node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out));
 }
 
 // Can take up to 1 hour

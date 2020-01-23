@@ -433,11 +433,6 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				ledger.cache.cemented_count += num_blocks_cemented;
 				ledger.stats.add (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in, num_blocks_cemented);
 
-				if (ledger.cache.cemented_count != ledger.stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out))
-				{
-					std::cout << "cheesey poofs" << std::endl;
-				}
-
 				/*
 				nano::confirmation_height_info confirmation_height_info_l;
 				ledger.store.confirmation_height_get (transaction, account, confirmation_height_info_l);
@@ -575,6 +570,11 @@ void nano::confirmation_height_processor::notify_observers (std::vector<callback
 		{
 			observer ();
 		}
+	}
+
+	if ((ledger.cache.cemented_count - 1) != ledger.stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out))
+	{
+		std::cout << "cheesey poofs" << std::endl;
 	}
 }
 
