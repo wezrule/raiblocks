@@ -208,6 +208,12 @@ void nano::confirmation_height_processor::process ()
 		auto block_height (ledger.store.block_account_height (transaction, current));
 		bool already_cemented = confirmation_height_info.height >= block_height;
 		// If we are not already at the bottom of the account chain (1 above cemented frontier) then find it
+
+		if (current.to_string () == "66B75FBA2E8EAC47B53910A9F725ACD74EB21F84D9C7171490F7224BF47BA213")
+		{
+			bool cheese = false;
+		}
+
 		if (!already_cemented && !hash_to_process.next.is_initialized () && block_height - confirmation_height_info.height > 1)
 		{
 			current = get_least_unconfirmed_hash_from_top_level (transaction, current, account, confirmation_height_info, block_height);
