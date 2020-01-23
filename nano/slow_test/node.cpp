@@ -544,7 +544,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	auto num_accounts = 10000;
+	auto num_accounts = 7; // TODO
 	auto latest_genesis = node->latest (nano::test_genesis_key.pub);
 	std::vector<std::shared_ptr<nano::open_block>> open_blocks;
 	{
@@ -556,18 +556,78 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 
 			nano::send_block send (latest_genesis, key.pub, node->config.online_weight_minimum.number (), nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest_genesis));
 			ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send).code);
+			std::cout << send.hash ().to_string () << std::endl;
 			auto open = std::make_shared<nano::open_block> (send.hash (), nano::test_genesis_key.pub, key.pub, key.prv, key.pub, *system.work.generate (key.pub));
 			ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, *open).code);
 			open_blocks.push_back (std::move (open));
 			latest_genesis = send.hash ();
 		}
+		std::cout << std::endl;
 	}
 
-	// Confirm all of the accounts
 	for (auto & open_block : open_blocks)
 	{
-		node->block_confirm (open_block);
+		std::cout << open_block->hash ().to_string () << std::endl <<std::endl;
 	}
+
+
+	system.deadline_set (10s);
+	node->confirmation_height_processor.add (open_blocks[0]->hash ());
+	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
+	node->confirmation_height_processor.add (open_blocks[1]->hash ());
+	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
+	node->confirmation_height_processor.add (open_blocks[5]->hash ());
+	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
+	node->confirmation_height_processor.add (open_blocks[3]->hash ());
+	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
+	node->confirmation_height_processor.add (open_blocks[2]->hash ());
+	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
+	node->confirmation_height_processor.add (open_blocks[4]->hash ());
+	while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
+
+	// Confirm all of the accounts
+//	node->block_confirm (open_blocks[0]);
+//	node->block_confirm (open_blocks[3]);
+//	node->block_confirm (open_blocks[1]);
+//	node->block_confirm (open_blocks[2]);
+//	node->block_confirm (open_blocks[4]);
+//	node->block_confirm (open_blocks[5]);
+
+/*
+	for (auto & open_block : open_blocks)
+	{
+//		node->block_confirm (open_block);
+
+		node->confirmation_height_processor.add (open_block->hash ());
+		//while (node->confirmation_height_processor.awaiting_processing_size () != 0)
+		//{
+		//	ASSERT_NO_ERROR (system.poll ());
+		//}
+	}*/
 
 	system.deadline_set (600s);
 	while (node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in) != (num_accounts - 1) * 2)

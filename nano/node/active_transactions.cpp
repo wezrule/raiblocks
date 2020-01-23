@@ -196,13 +196,13 @@ void nano::active_transactions::cemented_batch_finished_callback ()
 	// This can happen when a block wins an election, and the block is confirmed + observer
 	// called before the block hash gets added to election_winner_details. If the block is confirmed
 	// callbacks have already been done, so we can safely just remove it.
-	auto transaction = this->node.store.tx_begin_read ();
-	for (auto it = this->election_winner_details.begin (); it != this->election_winner_details.end ();)
+	auto transaction = node.store.tx_begin_read ();
+	for (auto it = election_winner_details.begin (); it != election_winner_details.end ();)
 	{
-		if (this->node.ledger.block_confirmed (transaction, it->first))
+		if (node.ledger.block_confirmed (transaction, it->first))
 		{
 			//std::cout << it->first.to_string () << std::endl;
-			it = this->election_winner_details.erase (it);
+			it = election_winner_details.erase (it);
 		}
 		else
 		{
@@ -1076,6 +1076,12 @@ std::chrono::steady_clock::time_point nano::active_transactions::find_dropped_el
 	{
 		return std::chrono::steady_clock::time_point{};
 	}
+}
+
+size_t nano::active_transactions::election_winner_details_size ()
+{
+	nano::lock_guard<std::mutex> guard (mutex);
+	return election_winner_details.size ();
 }
 
 nano::cementable_account::cementable_account (nano::account const & account_a, size_t blocks_uncemented_a) :

@@ -63,8 +63,9 @@ private:
 		nano::block_hash iterated_frontier;
 	};
 
-	std::unordered_map<account, confirmed_info> confirmed;
-	std::atomic<uint64_t> confirmed_size{ 0 };
+	/* Holds confirmation height/cemented frontier in memory for accounts while iterating */
+	std::unordered_map<account, confirmed_info> accounts_confirmed_info;
+	std::atomic<uint64_t> accounts_confirmed_info_size{ 0 };
 
 	class conf_height_details final
 	{
@@ -84,7 +85,7 @@ private:
 		nano::block_hash const & top_most_non_receive_block_hash;
 		bool already_cemented;
 		boost::circular_buffer_space_optimized<nano::block_hash> & checkpoints;
-		decltype (confirmed.begin ()) account_it;
+		decltype (accounts_confirmed_info .begin ()) account_it;
 		nano::confirmation_height_info const & confirmation_height_info;
 		nano::account const & account;
 		uint64_t num_contiguous_non_receive_blocks;

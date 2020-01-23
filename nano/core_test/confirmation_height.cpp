@@ -1146,7 +1146,7 @@ TEST (confirmation_height, election_winner_details_clearing)
 		transaction.refresh ();
 	}
 
-	ASSERT_EQ (0, node->active.election_winner_details.size ());
+	ASSERT_EQ (0, node->active.election_winner_details_size ());
 	node->block_confirm (send);
 	system.deadline_set (10s);
 	while (node->active.size () > 0)
@@ -1156,7 +1156,7 @@ TEST (confirmation_height, election_winner_details_clearing)
 
 	// Wait until this block is confirmed
 	system.deadline_set (10s);
-	while (node->active.election_winner_details.size () != 1 && !node->confirmation_height_processor.current ().is_zero ())
+	while (node->active.election_winner_details_size () != 1 && !node->confirmation_height_processor.current ().is_zero ())
 	{
 		ASSERT_NO_ERROR (system.poll ());
 	}
@@ -1167,7 +1167,7 @@ TEST (confirmation_height, election_winner_details_clearing)
 	node->confirmation_height_processor.add (send2.hash ());
 
 	system.deadline_set (10s);
-	while (node->active.election_winner_details.size () > 0)
+	while (node->active.election_winner_details_size () > 0)
 	{
 		ASSERT_NO_ERROR (system.poll ());
 	}

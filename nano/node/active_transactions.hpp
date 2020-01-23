@@ -126,6 +126,7 @@ public:
 	boost::circular_buffer<double> difficulty_trend ();
 	size_t inactive_votes_cache_size ();
 	std::unordered_map<nano::block_hash, std::shared_ptr<nano::election>> election_winner_details;
+	size_t election_winner_details_size ();
 	void add_dropped_elections_cache (nano::qualified_root const &);
 	std::chrono::steady_clock::time_point find_dropped_elections_cache (nano::qualified_root const &);
 	size_t dropped_elections_cache_size ();

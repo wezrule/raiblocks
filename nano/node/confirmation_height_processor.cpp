@@ -53,7 +53,7 @@ void nano::confirmation_height_processor::run ()
 			{
 				// Separate blocks which are pending confirmation height can be batched by a minimum processing time (to improve lmdb disk write performance),
 				// so make sure the slate is clean when a new batch is starting.
-				confirmed.clear ();
+				accounts_confirmed_info.clear ();
 				timer.restart ();
 			}
 			set_next_hash ();
@@ -160,6 +160,7 @@ void nano::confirmation_height_processor::set_next_hash ()
 	nano::lock_guard<std::mutex> guard (mutex);
 	assert (!awaiting_processing.empty ());
 	original_hash = *awaiting_processing.begin ();
+	//std::cout << "Original hash: " << original_hash.to_string () << std::endl;
 	original_hashes_pending.insert (original_hash);
 	awaiting_processing.erase (original_hash);
 }
@@ -185,8 +186,8 @@ void nano::confirmation_height_processor::process ()
 		release_assert (!ledger.store.confirmation_height_get (transaction, account, confirmation_height_info));
 
 		// Checks if we have encountered this account before but not commited changes yet, if so then update the cached confirmation height
-		auto account_it = confirmed.find (account);
-		if (account_it != confirmed.cend () && account_it->second.confirmed_height > confirmation_height_info.height)
+		auto account_it = accounts_confirmed_info.find (account);
+		if (account_it != accounts_confirmed_info.cend () && account_it->second.confirmed_height > confirmation_height_info.height)
 		{
 			confirmation_height_info.height = account_it->second.confirmed_height;
 			confirmation_height_info.frontier = account_it->second.iterated_frontier;
@@ -236,10 +237,12 @@ void nano::confirmation_height_processor::process ()
 			auto finished_iterating = current == original_hash;
 			auto non_awaiting_processing = awaiting_processing_size () == 0;
 			auto should_output = finished_iterating && (non_awaiting_processing || min_time_exceeded);
-			auto force_write = pending_writes.size () >= pending_writes_max_size || confirmed.size () >= pending_writes_max_size;
+			auto force_write = pending_writes.size () >= pending_writes_max_size || accounts_confirmed_info.size () >= pending_writes_max_size;
 
 			if (((max_batch_write_size_reached || should_output) && !pending_writes.empty ()) || force_write)
 			{
+				//std::cout << "WRITING" << std::endl;
+
 				bool error = false;
 				// If nothing is currently using the database write lock then write the cemented pending blocks otherwise continue iterating
 				if (write_database_queue.process (nano::writer::confirmation_height))
@@ -324,7 +327,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 		}
 
 		// We could be traversing a very large account so we don't want to open read transactions for too long.
-		if (num_contiguous_non_receive_blocks_a % batch_read_size == 0)
+		if ((num_contiguous_non_receive_blocks_a > 0) && num_contiguous_non_receive_blocks_a % batch_read_size == 0)
 		{
 			transaction_a.refresh ();
 		}
@@ -353,14 +356,15 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 		auto block_height = (ledger.store.block_account_height (preparation_data_a.transaction, preparation_data_a.top_most_non_receive_block_hash));
 		if (block_height > preparation_data_a.confirmation_height_info.height)
 		{
-			if (preparation_data_a.account_it != confirmed.cend ())
+			confirmed_info confirmed_info_l{ block_height, preparation_data_a.top_most_non_receive_block_hash };
+			if (preparation_data_a.account_it != accounts_confirmed_info.cend ())
 			{
-				preparation_data_a.account_it->second.confirmed_height = block_height;
+				preparation_data_a.account_it->second = confirmed_info_l;
 			}
 			else
 			{
-				confirmed.emplace (preparation_data_a.account, confirmed_info{ block_height, preparation_data_a.top_most_non_receive_block_hash });
-				confirmed_size = confirmed.size ();
+				accounts_confirmed_info.emplace (preparation_data_a.account, confirmed_info_l);
+				accounts_confirmed_info_size = accounts_confirmed_info.size ();
 			}
 
 			preparation_data_a.checkpoints.erase (std::remove (preparation_data_a.checkpoints.begin (), preparation_data_a.checkpoints.end (), preparation_data_a.top_most_non_receive_block_hash), preparation_data_a.checkpoints.end ());
@@ -373,8 +377,8 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 	auto & receive_details = preparation_data_a.receive_details;
 	if (receive_details)
 	{
-		auto receive_account_it = confirmed.find (receive_details->account);
-		if (receive_account_it != confirmed.cend ())
+		auto receive_account_it = accounts_confirmed_info.find (receive_details->account);
+		if (receive_account_it != accounts_confirmed_info.cend ())
 		{
 			auto current_height = receive_account_it->second.confirmed_height;
 			receive_details->num_blocks_confirmed = receive_details->num_blocks_confirmed;
@@ -386,8 +390,8 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			nano::block_sideband sideband;
 			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->hash, &sideband);
 			assert (block);
-			confirmed.emplace (receive_details->account, confirmed_info{ sideband.height, receive_details->hash });
-			confirmed_size = confirmed.size ();
+			accounts_confirmed_info.emplace (receive_details->account, confirmed_info{ sideband.height, receive_details->hash });
+			accounts_confirmed_info_size = accounts_confirmed_info.size ();
 		}
 
 		preparation_data_a.next_in_receive_chain = top_hash{ receive_details->top_level, receive_details->next };
@@ -438,7 +442,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 				if (count != cemented_count)
 				{
 					//int cheese = ledger.cache.cemented_count;
-					std::cout << "pew pew" << std::endl;
+					//std::cout << "pew pew" << std::endl;
 				}
 			};
 
@@ -446,6 +450,8 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			auto block = ledger.store.block_get (transaction, pending.start_hash, &sideband);
 			auto confirmation_height = sideband.height + pending.num_blocks_confirmed - 1;
 			auto start_height = sideband.height;
+
+			//std::cout << "PENDING start: " << pending.start_hash.to_string () << std::endl;
 
 			// TODO: Remove after
 			/*nano::confirmation_height_info confirmation_height_info;
@@ -481,6 +487,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 					return true;
 				}
 
+				//std::cout << "Cement block: " << block->hash ().to_string () << std::endl;
 				cemented_blocks.emplace_back (block, sideband);
 
 				// We have likely hit a long chain, flush these callbacks and continue
@@ -507,12 +514,12 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			auto num_blocks_cemented = pending.num_blocks_confirmed - total_blocks_cemented;
 			write_confirmation_height (num_blocks_cemented, confirmation_height, new_cemented_frontier);
 
-			auto it = confirmed.find (pending.account);
-			assert (it != confirmed.cend ());
-			if (it != confirmed.cend () && it->second.confirmed_height == confirmation_height)
+			auto it = accounts_confirmed_info.find (pending.account);
+			assert (it != accounts_confirmed_info.cend ());
+			if (it != accounts_confirmed_info.cend () && it->second.confirmed_height == confirmation_height)
 			{
-				confirmed.erase (pending.account);
-				confirmed_size = confirmed.size ();
+				accounts_confirmed_info.erase (pending.account);
+				accounts_confirmed_info_size = accounts_confirmed_info.size ();
 			}
 			pending_writes.pop_front ();
 			--pending_writes_size;
@@ -579,15 +586,15 @@ std::unique_ptr<nano::container_info_component> nano::collect_container_info (co
 {
 	auto composite = std::make_unique<container_info_composite> (name_a);
 
-	size_t cemented_observers_size;
+	size_t cemented_observers_count;
 	{
 		nano::lock_guard<std::mutex> guard (confirmation_height_processor_a.mutex);
-		cemented_observers_size = confirmation_height_processor_a.cemented_observers.size ();
+		cemented_observers_count = confirmation_height_processor_a.cemented_observers.size ();
 	}
 
-	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "cemented_observers", cemented_observers_size, sizeof (decltype (confirmation_height_processor_a.cemented_observers)::value_type) }));
+	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "cemented_observers", cemented_observers_count, sizeof (decltype (confirmation_height_processor_a.cemented_observers)::value_type) }));
 	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "pending_writes", confirmation_height_processor_a.pending_writes_size, sizeof (decltype (confirmation_height_processor_a.pending_writes)::value_type) }));
-	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "confirmed", confirmation_height_processor_a.confirmed_size, sizeof (decltype (confirmation_height_processor_a.confirmed)::value_type) }));
+	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "accounts_confirmed_info", confirmation_height_processor_a.accounts_confirmed_info_size, sizeof (decltype (confirmation_height_processor_a.accounts_confirmed_info)::value_type) }));
 	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "awaiting_processing", confirmation_height_processor_a.awaiting_processing_size (), sizeof (decltype (confirmation_height_processor_a.awaiting_processing)::value_type) }));
 	return composite;
 }
