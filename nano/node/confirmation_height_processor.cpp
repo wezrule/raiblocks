@@ -220,10 +220,21 @@ void nano::confirmation_height_processor::process ()
 
 		uint64_t num_contiguous_non_receive_blocks = 0;
 		auto top_most_non_receive_block_hash = current;
+
+		if (top_most_non_receive_block_hash.is_zero ())
+		{
+			bool poop = false;
+		}
+
 		bool hit_receive = false;
 		if (!already_cemented)
 		{
 			hit_receive = iterate (transaction, current, num_contiguous_non_receive_blocks, checkpoints, top_most_non_receive_block_hash, top_level_hash, receive_source_pairs, account);
+		}
+
+		if (top_most_non_receive_block_hash.is_zero ())
+		{
+			bool wazzza = false;
 		}
 
 		// Exit early when the processor has been stopped, otherwise this function may take a
