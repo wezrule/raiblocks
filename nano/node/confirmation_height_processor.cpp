@@ -142,6 +142,13 @@ nano::block_hash nano::confirmation_height_processor::get_least_unconfirmed_hash
 		if (block_height_a > confirmation_height_info_a.height)
 		{
 			auto block_l = ledger.store.block_get (transaction_a, confirmation_height_info_a.frontier, &sideband);
+
+			// TODO:
+			if (sideband.height != confirmation_height_info_a.height)
+			{
+				bool aaaa = false;
+			}
+
 			least_unconfirmed_hash = sideband.successor;
 		}
 	}
