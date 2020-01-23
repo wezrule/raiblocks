@@ -160,6 +160,13 @@ void nano::confirmation_height_processor::set_next_hash ()
 	nano::lock_guard<std::mutex> guard (mutex);
 	assert (!awaiting_processing.empty ());
 	original_hash = *awaiting_processing.begin ();
+
+	if (original_hash.to_string () == "66B75FBA2E8EAC47B53910A9F725ACD74EB21F84D9C7171490F7224BF47BA213")
+	{
+		// Breakpoint!
+		std::cout << "hit nano_1m1ag8pgrnd4ofe36c9kkrtnrreewxjfagkfc6hrak3kez7abtbj6gi7ii6x" << std::endl;
+	}
+
 	//std::cout << "Original hash: " << original_hash.to_string () << std::endl;
 	original_hashes_pending.insert (original_hash);
 	awaiting_processing.erase (original_hash);
