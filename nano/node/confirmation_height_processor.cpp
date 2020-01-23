@@ -213,6 +213,11 @@ void nano::confirmation_height_processor::process ()
 			current = get_least_unconfirmed_hash_from_top_level (transaction, current, account, confirmation_height_info, block_height);
 		}
 
+		if (current.to_string () == "562EA861A93BE5534DB0DEF4C8DA2E7CEC0CA47B2BEA2C2C55E11FC254522969")
+		{
+			bool cheese = false;
+		}
+
 		uint64_t num_contiguous_non_receive_blocks = 0;
 		auto top_most_non_receive_block_hash = current;
 		bool hit_receive = false;
@@ -343,6 +348,11 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 			}
 
 			hash = sideband.successor;
+
+			if (hash.to_string () == "562EA861A93BE5534DB0DEF4C8DA2E7CEC0CA47B2BEA2C2C55E11FC254522969")
+			{
+				bool cheese = false;
+			}
 		}
 
 		// We could be traversing a very large account so we don't want to open read transactions for too long.
