@@ -223,15 +223,16 @@ void nano::confirmation_height_processor::process ()
 
 		if (!already_cemented && block_height - confirmation_height_info.height > 1)
 		{
-			//if (!next_in_receive_chain.is_initialized ())
-		//	{
+			if (!next_in_receive_chain.is_initialized ())
+			{
 				current = get_least_unconfirmed_hash_from_top_level (transaction, current, account, confirmation_height_info, block_height);
-		//	}
-		//	else
-		//	{
+			}
+			else
+			{
 				// TODO: Need this?
-				//current = *hash_to_process.next;
-		//	}
+				current = *hash_to_process.next;
+				//bool cheese = false;
+			}
 		}
 
 		if (current.to_string () == "562EA861A93BE5534DB0DEF4C8DA2E7CEC0CA47B2BEA2C2C55E11FC254522969")
