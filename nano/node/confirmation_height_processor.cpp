@@ -358,7 +358,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 				// Store a checkpoint every max_items so that we can always traverse a long number of accounts to genesis
 				if (receive_source_pairs_a.size () % max_items == 0)
 				{
-					checkpoints_a.push_back (top_level_hash_a);
+					checkpoints_a.push_back (top_level_hash_a); // KEEP!
 				}
 
 				if (hash == top_level_hash_a)
@@ -369,8 +369,6 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 				{
 					hash = sideband.successor;	
 				}
-
-				//hash = sideband.successor;
 			}
 		}
 		else
@@ -423,12 +421,23 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 		{
 			bool cheese = false;
 		}*/
+	}
 
-		if (hash != top_level_hash_a)
+	if (hit_receive && hash != top_level_hash_a)
+	{
+		boost::optional<nano::block_hash> next;
+		if (num_contiguous_non_receive_blocks_above_first_receive > 0)
 		{
-			auto next{ !sideband.successor.is_zero () ? boost::optional<nano::block_hash> (sideband.successor) : boost::none };
-			last_receive_block_details.next = next;
+			next = !sideband.successor.is_zero () ? boost::optional<nano::block_hash> (sideband.successor) : boost::none;
+	
 		}
+		else
+		{
+			next = hash; // start_hash_a;
+		}
+
+		auto last_receive_block_details = receive_source_pairs_a.back ().receive_details;
+		last_receive_block_details.next = next;
 	}
 
 	return hit_receive;
