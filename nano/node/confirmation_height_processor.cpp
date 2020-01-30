@@ -352,7 +352,17 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 				{
 					checkpoints_a.push_back (top_level_hash_a);
 				}
-				hash = sideband.successor;
+
+				if (hash == top_level_hash_a)
+				{
+					reached_target = true;
+				}
+				else
+				{
+					hash = sideband.successor;	
+				}
+
+				//hash = sideband.successor;
 			}
 		}
 		else
@@ -366,13 +376,17 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 				// Found a send/change/epoch block which isn't the desired top level
 				++num_contiguous_non_receive_blocks_a;
 				top_most_non_receive_block_hash_a = hash;
-				if (hash == top_level_hash_a)
-				{
-					reached_target = true;
-				}
 			}
 
-			hash = sideband.successor;
+			if (hash == top_level_hash_a)
+			{
+				reached_target = true;
+			}
+			else
+			{
+				hash = sideband.successor;	
+			}
+
 
 			if (hash.to_string () == "562EA861A93BE5534DB0DEF4C8DA2E7CEC0CA47B2BEA2C2C55E11FC254522969")
 			{
@@ -391,7 +405,6 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 	if (num_contiguous_non_receive_blocks_above_first_receive > 0)
 	{
 		assert (hit_receive);
-		auto next{ !sideband.successor.is_zero () ? boost::optional<nano::block_hash> (sideband.successor) : boost::none };
 		auto last_receive_block_details = receive_source_pairs_a.back ().receive_details;
 		last_receive_block_details.num_blocks_confirmed = num_contiguous_non_receive_blocks_above_first_receive + 1;
 
@@ -403,8 +416,11 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 			bool cheese = false;
 		}*/
 
-
-		last_receive_block_details.next = next;
+		if (hash != top_level_hash_a)
+		{
+			auto next{ !sideband.successor.is_zero () ? boost::optional<nano::block_hash> (sideband.successor) : boost::none };
+			last_receive_block_details.next = next;
+		}
 	}
 
 	return hit_receive;

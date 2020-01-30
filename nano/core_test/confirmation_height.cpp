@@ -133,6 +133,29 @@ TEST (confirmation_height, multiple_accounts)
 	// The nodes process a live receive which propagates across to all accounts
 	auto receive3 = std::make_shared<nano::receive_block> (open3.hash (), send6.hash (), key3.prv, key3.pub, *system.work.generate (open3.hash ()));
 
+        {
+             std::cout << send3.hash ().to_string () << std::endl;
+             std::cout << send2.hash ().to_string () << std::endl;
+             std::cout << send1.hash ().to_string () << std::endl;
+             std::cout << latest1.to_string () << std::endl;
+             std::cout << nano::test_genesis_key.pub.to_account () << std::endl << std::endl;
+
+             std::cout << send5.hash ().to_string () << std::endl;
+             std::cout << send4.hash ().to_string () << std::endl;
+             std::cout << open1.hash ().to_string () << std::endl;
+             std::cout << key1.pub.to_account () << std::endl << std::endl;
+
+             std::cout << receive2.hash ().to_string () << std::endl;
+             std::cout << send6.hash ().to_string () << std::endl;
+             std::cout << receive1.hash ().to_string () << std::endl;
+             std::cout << open2.hash ().to_string () << std::endl;
+             std::cout << key2.pub.to_account () << std::endl << std::endl;
+
+             std::cout << receive3->hash ().to_string () << std::endl;
+             std::cout << open3.hash ().to_string () << std::endl;
+             std::cout << key3.pub.to_account () << std::endl;
+	     }
+
 	node->process_active (receive3);
 	node->block_processor.flush ();
 
