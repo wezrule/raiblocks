@@ -409,6 +409,23 @@ TEST (confirmation_height, send_receive_between_2_accounts)
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send6).code);
 	}
 
+       {
+		    std::cout << send6.hash ().to_string () << std::endl;
+		    std::cout << send5.hash ().to_string () << std::endl;
+			std::cout << receive3.hash ().to_string () << std::endl;
+             std::cout << receive2.hash ().to_string () << std::endl;
+             std::cout << receive1.hash ().to_string () << std::endl;
+             std::cout << send1.hash ().to_string () << std::endl;
+             std::cout << nano::test_genesis_key.pub.to_account () << std::endl << std::endl;
+
+			 std::cout << receive4->hash ().to_string () << std::endl;
+			 std::cout << send4.hash ().to_string () << std::endl;
+			 std::cout << send3.hash ().to_string () << std::endl;
+             std::cout << send2.hash ().to_string () << std::endl;
+             std::cout << open1.hash ().to_string () << std::endl;
+             std::cout << key1.pub.to_account () << std::endl << std::endl;
+     }
+
 	add_callback_stats (*node);
 
 	node->process_active (receive4);
@@ -563,6 +580,38 @@ TEST (confirmation_height, all_block_types)
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, state_send4).code);
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, state_receive3).code);
 	}
+
+
+       {
+
+			std::cout << state_receive3.hash ().to_string () << std::endl;
+             std::cout << send1.hash ().to_string () << std::endl;
+			 std::cout << send.hash ().to_string () << std::endl;
+			 std::cout << latest.to_string () << std::endl;
+             std::cout << nano::test_genesis_key.pub.to_account () << std::endl << std::endl;
+
+			 std::cout << state_send4.hash ().to_string () << std::endl;
+			 std::cout << state_send1.hash ().to_string () << std::endl;
+			 std::cout << epoch1.hash ().to_string () << std::endl;
+			 std::cout << change.hash ().to_string () << std::endl;
+			 std::cout << receive.hash ().to_string () << std::endl;
+             std::cout << send2.hash ().to_string () << std::endl;
+             std::cout << open.hash ().to_string () << std::endl;
+             std::cout << key1.pub.to_account () << std::endl << std::endl;
+
+			 std::cout << state_send3.hash ().to_string () << std::endl;
+			 std::cout << state_send2->hash ().to_string () << std::endl;
+			 std::cout << state_receive2.hash ().to_string () << std::endl;
+			 std::cout << epoch.hash ().to_string () << std::endl;
+			 std::cout << state_change.hash ().to_string () << std::endl;
+			 std::cout << state_send.hash ().to_string () << std::endl;
+			 std::cout << state_receive.hash ().to_string () << std::endl;
+             std::cout << state_open.hash ().to_string () << std::endl;
+             std::cout << key2.pub.to_account () << std::endl << std::endl;
+
+	}
+
+
 
 	add_callback_stats (*node);
 	node->block_confirm (state_send2);
