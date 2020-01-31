@@ -528,9 +528,9 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			preparation_data_a.next_in_receive_chain = top_hash{ receive_details->top_level, receive_details->next };
 		}
 
-		if (receive_details->hash == receive_details->top_level)
+		if (receive_details->iterated_frontier == receive_details->top_level)
 		{
-			preparation_data_a.checkpoints.erase (std::remove (preparation_data_a.checkpoints.begin (), preparation_data_a.checkpoints.end (), receive_details->hash), preparation_data_a.checkpoints.end ());
+			preparation_data_a.checkpoints.erase (std::remove (preparation_data_a.checkpoints.begin (), preparation_data_a.checkpoints.end (), receive_details->iterated_frontier), preparation_data_a.checkpoints.end ());
 		}
 
 		pending_writes.emplace_back (receive_details->account, receive_details->num_blocks_confirmed, receive_details->hash);
@@ -554,6 +554,19 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			const auto & pending = pending_writes.front ();
 
 			auto write_confirmation_height = [& account = pending.account, &ledger = ledger, &transaction](uint64_t num_blocks_cemented, uint64_t confirmation_height, nano::block_hash const & confirmed_frontier) {
+
+				// === DEBUG ===
+				nano::confirmation_height_info confirmation_height_info;
+				ledger.store.confirmation_height_get (transaction, account, confirmation_height_info);
+
+				nano::block_sideband sideband;
+				ledger.store.block_get (transaction, confirmed_frontier, &sideband);
+
+				if (sideband.height != confirmation_height_info.height + num_blocks_cemented)
+				{
+					std::cout << "WE HAVE AN ISSUE" << std::endl;
+				}
+
 				ledger.store.confirmation_height_put (transaction, account, nano::confirmation_height_info{ confirmation_height, confirmed_frontier });
 				ledger.cache.cemented_count += num_blocks_cemented;
 				ledger.stats.add (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in, num_blocks_cemented);
