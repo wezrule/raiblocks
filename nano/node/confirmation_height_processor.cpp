@@ -195,11 +195,6 @@ void nano::confirmation_height_processor::process ()
 		auto hash_to_process = get_next_block (next_in_receive_chain, checkpoints, receive_source_pairs, receive_details);
 		current = hash_to_process.top;
 
-		if (current.to_string () == "66B75FBA2E8EAC47B53910A9F725ACD74EB21F84D9C7171490F7224BF47BA213")
-		{
-			bool cheese = false;
-		}
-
 		auto top_level_hash = current;
 		nano::account account (ledger.store.block_account (transaction, current));
 		release_assert (!ledger.store.confirmation_height_get (transaction, account, confirmation_height_info));
@@ -216,11 +211,6 @@ void nano::confirmation_height_processor::process ()
 		bool already_cemented = confirmation_height_info.height >= block_height;
 		// If we are not already at the bottom of the account chain (1 above cemented frontier) then find it
 
-		if (current.to_string () == "66B75FBA2E8EAC47B53910A9F725ACD74EB21F84D9C7171490F7224BF47BA213")
-		{
-			bool cheese = false;
-		}
-
 		if (!already_cemented && block_height - confirmation_height_info.height > 1)
 		{
 			if (!next_in_receive_chain.is_initialized ())
@@ -229,34 +219,23 @@ void nano::confirmation_height_processor::process ()
 			}
 			else
 			{
-				// TODO: Need this?
 				current = *hash_to_process.next;
-				//bool cheese = false;
 			}
 		}
 
-		if (current.to_string () == "562EA861A93BE5534DB0DEF4C8DA2E7CEC0CA47B2BEA2C2C55E11FC254522969")
+		// ==== NEW ==== DotCom receive
+		if (current.to_string () == "9E8001F46F7AEB38036049D2ACCC2A5263ACE62CA215ADF358F61500ABF82D68")
 		{
-			bool cheese = false;
+			bool sdfsd = false;
 		}
 
 		uint64_t num_contiguous_non_receive_blocks = 0;
 		auto top_most_non_receive_block_hash = current;
 
-		if (top_most_non_receive_block_hash.is_zero ())
-		{
-			bool poop = false;
-		}
-
 		bool hit_receive = false;
-		if (!already_cemented)
+		if (!already_cemented) // && block_height - confirmation_height_info.height > 1)
 		{
 			hit_receive = iterate (transaction, current, num_contiguous_non_receive_blocks, checkpoints, top_most_non_receive_block_hash, top_level_hash, receive_source_pairs, account);
-		}
-
-		if (top_most_non_receive_block_hash.is_zero ())
-		{
-			bool wazzza = false;
 		}
 
 		// Exit early when the processor has been stopped, otherwise this function may take a
@@ -414,12 +393,6 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 				prev_hash = hash;
 				hash = sideband.successor;	
 			}
-
-
-			if (hash.to_string () == "562EA861A93BE5534DB0DEF4C8DA2E7CEC0CA47B2BEA2C2C55E11FC254522969")
-			{
-				bool cheese = false;
-			}
 		}
 
 		// We could be traversing a very large account so we don't want to open read transactions for too long.
@@ -470,8 +443,6 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 			bool falaasda = false;
 		}
 
-
-
 		auto & last_receive_block_details = receive_source_pairs_a.back ().receive_details;
 		last_receive_block_details.next = next;
 	}
@@ -508,6 +479,13 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 				accounts_confirmed_info_size = accounts_confirmed_info.size ();
 			}
 
+			// ==== NEW (Beta) ====
+			// Check if pending_writes already contains something for this account with a higher cemented
+			if (preparation_data_a.bottom_most.to_string () == "411912EC4269EA956C337556E44B1E7C6B6A5E5F53A337F5A5864AA0363A0159")
+			{
+				bool cheese_poofs = false;
+			}
+
 			preparation_data_a.checkpoints.erase (std::remove (preparation_data_a.checkpoints.begin (), preparation_data_a.checkpoints.end (), preparation_data_a.top_most_non_receive_block_hash), preparation_data_a.checkpoints.end ());
 			pending_writes.emplace_back (preparation_data_a.account, preparation_data_a.num_contiguous_non_receive_blocks, preparation_data_a.bottom_most);
 			++pending_writes_size;
@@ -533,7 +511,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			}
 
 			
-			receive_account_it->second.confirmed_height = current_height + receive_details->num_blocks_confirmed;
+			receive_account_it->second.confirmed_height = sideband1.height; // current_height + receive_details->num_blocks_confirmed;
 			receive_account_it->second.iterated_frontier = receive_details->iterated_frontier;
 		}
 		else
@@ -545,7 +523,10 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 			accounts_confirmed_info_size = accounts_confirmed_info.size ();
 		}
 
-		preparation_data_a.next_in_receive_chain = top_hash{ receive_details->top_level, receive_details->next };
+		if (receive_details->iterated_frontier != receive_details->top_level)
+		{
+			preparation_data_a.next_in_receive_chain = top_hash{ receive_details->top_level, receive_details->next };
+		}
 
 		if (receive_details->hash == receive_details->top_level)
 		{
@@ -599,8 +580,18 @@ bool nano::confirmation_height_processor::cement_blocks ()
 
 			nano::block_sideband sideband;
 			auto block = ledger.store.block_get (transaction, pending.start_hash, &sideband);
+
+			nano::confirmation_height_info confirmation_height_info;
+			release_assert (!ledger.store.confirmation_height_get (transaction, pending.account, confirmation_height_info));
+
 			auto confirmation_height = sideband.height + pending.num_blocks_confirmed - 1;
+			if (confirmation_height > confirmation_height_info.height)
+			{
+
+
 			auto start_height = sideband.height;
+
+			//if (confirmation_height > )
 
 			//std::cout << "PENDING start: " << pending.start_hash.to_string () << std::endl;
 
@@ -665,19 +656,37 @@ bool nano::confirmation_height_processor::cement_blocks ()
 			auto num_blocks_cemented = pending.num_blocks_confirmed - total_blocks_cemented;
 			write_confirmation_height (num_blocks_cemented, confirmation_height, new_cemented_frontier);
 
-			auto it = accounts_confirmed_info.find (pending.account);
-			if (it == accounts_confirmed_info.cend ())
-			{
-				std::cout << "Pending Account " << pending.account.to_account () << std::endl;
 			}
-			assert (it != accounts_confirmed_info.cend ());
+
+			auto it = accounts_confirmed_info.find (pending.account);
+		//	if (it == accounts_confirmed_info.cend ())
+		//	{
+		//		std::cout << "Pending Account " << pending.account.to_account () << std::endl;
+			//}
+			//assert (it != accounts_confirmed_info.cend ());
 			if (it != accounts_confirmed_info.cend () && it->second.confirmed_height == confirmation_height)
 			{
 				accounts_confirmed_info.erase (pending.account);
 				accounts_confirmed_info_size = accounts_confirmed_info.size ();
+
+				// TODO: Just doing here for debugging purposes
+				//pending_writes.pop_front ();
+				//--pending_writes_size;
+
+				//auto it = std::find_if (pending_writes.begin (), pending_writes.end (), [&acc = pending.account](auto & pending_write) {
+				//	return pending_write.account == acc;
+				//});
+
+				//if (it != pending_writes.end ())
+				//{
+				//	bool still_exists = false;
+				//}
 			}
+//			else
+//			{
 			pending_writes.pop_front ();
 			--pending_writes_size;
+//			}
 		}
 	}
 
