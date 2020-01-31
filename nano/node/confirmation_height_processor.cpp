@@ -564,6 +564,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 
 				if (sideband.height != confirmation_height_info.height + num_blocks_cemented)
 				{
+					volatile int x = 3;
 					std::cout << "WE HAVE AN ISSUE" << std::endl;
 				}
 
