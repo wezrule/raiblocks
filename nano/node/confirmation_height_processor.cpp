@@ -503,15 +503,29 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 //			receive_details->num_blocks_confirmed = receive_details->num_blocks_confirmed;
 
 			// TODO:
-			nano::block_sideband sideband1;
-			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->iterated_frontier, &sideband1);
-			if (sideband1.height != current_height + receive_details->num_blocks_confirmed)
+			nano::block_sideband sideband;
+			ledger.store.block_get (preparation_data_a.transaction, receive_details->iterated_frontier, &sideband);
+			if (sideband.height != current_height + receive_details->num_blocks_confirmed)
 			{
-				bool cheese = false;
-			}
+				// Mismatch, apply horrible patch
+				nano::block_sideband sideband1;
+				auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->hash, &sideband1);
 
+				auto const num_extra_blocks = (sideband.height - (current_height + receive_details->num_blocks_confirmed));
+				auto blocks_remaining = num_extra_blocks;
+				while (blocks_remaining-- > 0)
+				{
+					block = ledger.store.block_get (preparation_data_a.transaction, block->previous (), &sideband1);
+					assert (block);
+				}
+
+				receive_details->num_blocks_confirmed += num_extra_blocks;
+				receive_details->hash = block->hash (); // Although this appears as the receive block hash everywhere, this is ok to modify as the "bottom most block" as that will be its next use
+			}
 			
-			receive_account_it->second.confirmed_height = sideband1.height; // current_height + receive_details->num_blocks_confirmed;
+			assert (current_height + receive_details->num_blocks_confirmed == sideband.height);
+
+			receive_account_it->second.confirmed_height = current_height + receive_details->num_blocks_confirmed; // sideband.height;
 			receive_account_it->second.iterated_frontier = receive_details->iterated_frontier;
 		}
 		else

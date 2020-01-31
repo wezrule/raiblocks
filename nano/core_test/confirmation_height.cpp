@@ -340,8 +340,6 @@ TEST (confirmation_height, gap_live)
 		system.deadline_set (1000s);
 		while (node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out) != 6)
 		{
-			auto s = node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out);
-
 			ASSERT_NO_ERROR (system.poll ());
 		}
 
@@ -1160,7 +1158,6 @@ TEST (confirmation_height, dependent_election)
 	system.deadline_set (10s);
 	while (3 != node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out))
 	{
-		auto s = node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out);
 		ASSERT_NO_ERROR (system.poll ());
 	}
 
@@ -1171,6 +1168,87 @@ TEST (confirmation_height, dependent_election)
 
 	nano::lock_guard<std::mutex> guard (node->active.mutex);
 	ASSERT_EQ (0, node->active.election_winner_details.size ());
+}
+
+TEST (confirmation_height, overlapping_writes)
+{
+	nano::system system;
+	nano::node_config node_config (nano::get_available_port (), system.logging);
+	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
+	auto node = system.add_node (node_config);
+
+	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
+	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
+
+	nano::keypair key1;
+	system.wallet (0)->insert_adhoc (key1.prv);
+
+	nano::send_block send (latest, key1.pub, nano::genesis_amount - nano::Gxrb_ratio, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest));
+	nano::send_block send1 (send.hash (), key1.pub, nano::genesis_amount - nano::Gxrb_ratio * 2, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (send.hash ()));
+	nano::keypair dummy_key;
+	nano::send_block dummy_send (send1.hash (), dummy_key.pub, nano::genesis_amount - nano::Gxrb_ratio * 3, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (send1.hash ()));
+
+	nano::open_block open (send.hash (), nano::genesis_account, key1.pub, key1.prv, key1.pub, *system.work.generate (key1.pub));
+	nano::receive_block receive1 (open.hash (), send1.hash (), key1.prv, key1.pub, *system.work.generate (open.hash ()));
+	nano::send_block send2 (receive1.hash (), nano::test_genesis_key.pub, nano::Gxrb_ratio, key1.prv, key1.pub, *system.work.generate (receive1.hash ()));
+
+	nano::receive_block receive2 (dummy_send.hash (), send2.hash (),  nano::test_genesis_key.prv,  nano::test_genesis_key.pub, *system.work.generate (dummy_send.hash ()));
+	nano::send_block dummy_send1 (receive2.hash (), dummy_key.pub, nano::genesis_amount - nano::Gxrb_ratio * 3, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (receive2.hash ()));
+
+	nano::keypair key2;
+	system.wallet (0)->insert_adhoc (key2.prv);
+	nano::send_block send3 (dummy_send1.hash (), key2.pub, nano::genesis_amount - nano::Gxrb_ratio * 4, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (dummy_send1.hash ()));
+	nano::send_block dummy_send2 (send3.hash (), dummy_key.pub, nano::genesis_amount - nano::Gxrb_ratio * 5, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (send3.hash ()));
+
+	auto open1 = std::make_shared<nano::open_block> (send3.hash (), nano::genesis_account, key2.pub, key2.prv, key2.pub, *system.work.generate (key2.pub));
+
+	{
+		auto transaction = node->store.tx_begin_write ();
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send).code);
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send1).code);
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, dummy_send).code);
+
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, open).code);
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, receive1).code);
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send2).code);
+
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, receive2).code);
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, dummy_send1).code);
+
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, send3).code);
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, dummy_send2).code);
+
+		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, *open1).code);
+	}
+
+	{
+        std::cout << open1->hash ().to_string () << std::endl;
+        std::cout << key2.pub.to_account () << std::endl << std::endl;
+
+		std::cout << dummy_send2.hash ().to_string () << std::endl;
+		std::cout << send3.hash ().to_string () << std::endl;
+		std::cout << dummy_send1.hash ().to_string () << std::endl;
+        std::cout << receive2.hash ().to_string () << std::endl;
+        std::cout << dummy_send.hash ().to_string () << std::endl;
+        std::cout << send1.hash ().to_string () << std::endl;
+        std::cout << send.hash ().to_string () << std::endl;
+        std::cout << latest.to_string () << std::endl;
+        std::cout << nano::test_genesis_key.pub.to_account () << std::endl << std::endl;
+
+        std::cout << send2.hash ().to_string () << std::endl;
+        std::cout << receive1.hash ().to_string () << std::endl;
+        std::cout << open.hash ().to_string () << std::endl;
+        std::cout << key1.pub.to_account () << std::endl << std::endl;
+	}
+
+	add_callback_stats (*node);
+
+	node->block_confirm (open1);
+	system.deadline_set (1000s);
+	while (10 != node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out))
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
 }
 
 TEST (confirmation_height, election_winner_details_clearing)
