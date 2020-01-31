@@ -70,13 +70,14 @@ private:
 	class conf_height_details final
 	{
 	public:
-		conf_height_details (nano::account const &, nano::block_hash const &, uint64_t, nano::block_hash const &, boost::optional<nano::block_hash>, nano::block_hash const & iterated_frontier);
+		conf_height_details (nano::account const &, nano::block_hash const &, uint64_t, nano::block_hash const &, boost::optional<nano::block_hash>, nano::block_hash const & iterated_frontier, uint64_t iterated_frontier_height_a);
 		nano::account account;
 		nano::block_hash hash;
 		uint64_t num_blocks_confirmed;
 		nano::block_hash top_level;
 		nano::block_hash iterated_frontier; // Should be block hash at -> hash + num_blocks_confirmed
 		boost::optional<nano::block_hash> next;
+		uint64_t iterated_frontier_height;
 	};
 
 	class preparation_data final

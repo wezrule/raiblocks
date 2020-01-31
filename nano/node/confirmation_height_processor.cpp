@@ -315,14 +315,22 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 	nano::block_sideband sideband;
 	boost::optional<nano::block_hash> next;
 
-	auto iterated_frontier = hash;
+	nano::block_hash iterated_frontier{0}; // = hash;
+	uint64_t iterated_frontier_height = 0;
 	auto prev_hash = hash;
+	//auto first = true;
 
 	//bool hit_two_receives = false;
 	while (!hash.is_zero () && !reached_target && !stopped)
 	{
 		// Keep iterating going up until we either reach the desired block or a receive the
 		auto block = ledger.store.block_get (transaction_a, hash, &sideband);
+//		if (first)
+//		{
+//			iterated_frontier_height = sideband.height;
+//			first = false;
+//		}
+
 		auto source (block->source ());
 		if (source.is_zero ())
 		{
@@ -336,9 +344,10 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 			{
 				reached_target = true;
 				iterated_frontier = prev_hash;
+				iterated_frontier_height = sideband.height - 1;
 				if (hash != top_level_hash_a)
 				{
-					next = hash; // Next will be the following receive block			
+					next = hash; // Next will be the following receive block
 				}
 				else
 				{
@@ -349,7 +358,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 			{
 				hit_receive = true;
 				// Set the number of blocks to 1 initially, this will be updated for all blocks above this receive, until the next receive is reached
-				receive_source_pairs_a.push_back (receive_source_pair{ conf_height_details{ account_a, hash, 1, top_level_hash_a, boost::none, hash }, source });
+				receive_source_pairs_a.push_back (receive_source_pair{ conf_height_details{ account_a, hash, 1, top_level_hash_a, boost::none, hash, sideband.height }, source });
 				// Store a checkpoint every max_items so that we can always traverse a long number of accounts to genesis
 				if (receive_source_pairs_a.size () % max_items == 0)
 				{
@@ -374,7 +383,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 			{
 				++num_contiguous_non_receive_blocks_above_first_receive;
 				iterated_frontier = hash;// prev_hash; // or hash?
-
+				iterated_frontier_height = sideband.height;
 				//next = hash;
 			}
 			else
@@ -406,9 +415,11 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 	if (num_contiguous_non_receive_blocks_above_first_receive > 0)
 	{
 		assert (hit_receive);
+		assert (!iterated_frontier.is_zero ());
 		auto & last_receive_block_details = receive_source_pairs_a.back ().receive_details;
 		last_receive_block_details.num_blocks_confirmed = num_contiguous_non_receive_blocks_above_first_receive + 1;
 		last_receive_block_details.iterated_frontier = iterated_frontier;// // top_most_non_receive_block_hash_a; // hash
+		last_receive_block_details.iterated_frontier_height = iterated_frontier_height;
 
 		// TODO:
 		/*nano::block_sideband sideband1;
@@ -500,18 +511,20 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 		if (receive_account_it != accounts_confirmed_info.cend ())
 		{
 			auto current_height = receive_account_it->second.confirmed_height;
-//			receive_details->num_blocks_confirmed = receive_details->num_blocks_confirmed;
 
 			// TODO:
-			nano::block_sideband sideband;
-			ledger.store.block_get (preparation_data_a.transaction, receive_details->iterated_frontier, &sideband);
-			if (sideband.height != current_height + receive_details->num_blocks_confirmed)
+		//	nano::block_sideband sideband;
+		//	ledger.store.block_get (preparation_data_a.transaction, receive_details->iterated_frontier, &sideband);
+		//	if (sideband.height != current_height + receive_details->num_blocks_confirmed) // used to be sideband.height
+		
+			
+			if (receive_details->iterated_frontier_height != current_height + receive_details->num_blocks_confirmed) // used to be sideband.height
 			{
 				// Mismatch, apply horrible patch
 				nano::block_sideband sideband1;
 				auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->hash, &sideband1);
 
-				auto const num_extra_blocks = (sideband.height - (current_height + receive_details->num_blocks_confirmed));
+				auto const num_extra_blocks = (receive_details->iterated_frontier_height - (current_height + receive_details->num_blocks_confirmed)); // sideband.height
 				auto blocks_remaining = num_extra_blocks;
 				while (blocks_remaining-- > 0)
 				{
@@ -523,17 +536,31 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 				receive_details->hash = block->hash (); // Although this appears as the receive block hash everywhere, this is ok to modify as the "bottom most block" as that will be its next use
 			}
 			
-			assert (current_height + receive_details->num_blocks_confirmed == sideband.height);
+			assert (current_height + receive_details->num_blocks_confirmed == receive_details->iterated_frontier_height);
 
 			receive_account_it->second.confirmed_height = current_height + receive_details->num_blocks_confirmed; // sideband.height;
 			receive_account_it->second.iterated_frontier = receive_details->iterated_frontier;
 		}
 		else
 		{
+			/*
 			nano::block_sideband sideband;
 			auto block = ledger.store.block_get (preparation_data_a.transaction, receive_details->iterated_frontier, &sideband);
 			assert (block);
+
+			if (receive_details->iterated_frontier_height != sideband.height)
+			{
+				auto cheese1 = receive_details->iterated_frontier_height;
+				auto hash = receive_details->iterated_frontier;
+
+				bool cheese = false;
+			}
+
 			accounts_confirmed_info.emplace (receive_details->account, confirmed_info{ sideband.height, receive_details->iterated_frontier });
+			accounts_confirmed_info_size = accounts_confirmed_info.size ();
+			*/
+
+			accounts_confirmed_info.emplace (receive_details->account, confirmed_info{ receive_details->iterated_frontier_height, receive_details->iterated_frontier });
 			accounts_confirmed_info_size = accounts_confirmed_info.size ();
 		}
 
@@ -541,8 +568,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 		{
 			preparation_data_a.next_in_receive_chain = top_hash{ receive_details->top_level, receive_details->next };
 		}
-
-		if (receive_details->iterated_frontier == receive_details->top_level)
+		else
 		{
 			preparation_data_a.checkpoints.erase (std::remove (preparation_data_a.checkpoints.begin (), preparation_data_a.checkpoints.end (), receive_details->iterated_frontier), preparation_data_a.checkpoints.end ());
 		}
@@ -763,13 +789,14 @@ void nano::confirmation_height_processor::notify_observers (std::vector<callback
 	}
 }
 
-nano::confirmation_height_processor::conf_height_details::conf_height_details (nano::account const & account_a, nano::block_hash const & hash_a, uint64_t num_blocks_confirmed_a, nano::block_hash const & top_level_a, boost::optional<nano::block_hash> next_a, nano::block_hash const & iterated_frontier_a) :
+nano::confirmation_height_processor::conf_height_details::conf_height_details (nano::account const & account_a, nano::block_hash const & hash_a, uint64_t num_blocks_confirmed_a, nano::block_hash const & top_level_a, boost::optional<nano::block_hash> next_a, nano::block_hash const & iterated_frontier_a, uint64_t iterated_frontier_height_a) :
 hash (hash_a),
 num_blocks_confirmed (num_blocks_confirmed_a),
 top_level (top_level_a),
 account (account_a),
 next (next_a),
-iterated_frontier (iterated_frontier_a)
+iterated_frontier (iterated_frontier_a),
+iterated_frontier_height (iterated_frontier_height_a)
 {
 }
 
