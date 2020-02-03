@@ -448,7 +448,7 @@ bool nano::confirmation_height_processor::cement_blocks ()
 					start_height = pending.bottom_height;
 				}
 				else
-				{	
+				{
 					auto block = ledger.store.block_get (transaction, confirmation_height_info.frontier, &sideband);
 					new_cemented_frontier = sideband.successor;
 					num_blocks_confirmed = pending.top_height - confirmation_height_info.height;
