@@ -108,7 +108,7 @@ void nano::telemetry::ongoing_req_all_peers ()
 
 				this->ongoing_req_all_peers ();
 			}
-		}		
+		}
 	});
 }
 
@@ -148,7 +148,7 @@ nano::telemetry_data_responses nano::telemetry::get_metrics_peers ()
 // After a request is made to a single peer we want to remove it from the container after the peer has not been requested for a while (cache_cutoff).
 void nano::telemetry::ongoing_single_request_cleanup (nano::endpoint const & endpoint_a, nano::telemetry::single_request_data const & single_request_data_a)
 {
-	alarm.add (std::chrono::steady_clock::now () + single_request_data_a.impl->cache_cutoff, [this, telemetry_impl_w = std::weak_ptr<nano::telemetry_impl> (single_request_data_a.impl), &single_request_data_a, &endpoint_a] () {
+	alarm.add (std::chrono::steady_clock::now () + single_request_data_a.impl->cache_cutoff, [this, telemetry_impl_w = std::weak_ptr<nano::telemetry_impl> (single_request_data_a.impl), &single_request_data_a, &endpoint_a]() {
 		if (auto telemetry_impl = telemetry_impl_w.lock ())
 		{
 			nano::lock_guard<std::mutex> guard (this->mutex);
