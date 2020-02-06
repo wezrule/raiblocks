@@ -593,11 +593,6 @@ TEST (confirmation_height, all_block_types)
 		}
 
 		auto transaction (node->store.tx_begin_read ());
-		if (!node->ledger.block_confirmed (transaction, state_send2->hash ()))
-		{
-			bool cheese = false;
-		}
-
 		ASSERT_TRUE (node->ledger.block_confirmed (transaction, state_send2->hash ()));
 		nano::account_info account_info;
 		nano::confirmation_height_info confirmation_height_info;
