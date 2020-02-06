@@ -470,6 +470,13 @@ public:
 	bootstrap_constants bootstrap;
 };
 
+enum class confirmation_height_mode
+{
+	automatic,
+	unbounded,
+	bounded
+};
+
 /* Holds flags for various cacheable data. For most CLI operations caching is unnecessary
  * (e.g getting the checked block count) so it can be disabled for performance reasons. */
 class generate_cache

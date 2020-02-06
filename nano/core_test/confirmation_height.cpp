@@ -20,52 +20,62 @@ void add_callback_stats (nano::node & node)
 
 TEST (confirmation_height, single)
 {
-	auto amount (std::numeric_limits<nano::uint128_t>::max ());
-	nano::system system;
-	auto node = system.add_node ();
-	nano::keypair key1;
-	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
-	nano::block_hash latest1 (node->latest (nano::test_genesis_key.pub));
-	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, latest1, nano::test_genesis_key.pub, amount - 100, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest1)));
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
+		auto amount (std::numeric_limits<nano::uint128_t>::max ());
+		nano::system system;
+		nano::node_flags node_flags;
+		node_flags.confirmation_height_processor_mode = mode_a;
+		auto node = system.add_node (node_flags);
+		nano::keypair key1;
+		system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
+		nano::block_hash latest1 (node->latest (nano::test_genesis_key.pub));
+		auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, latest1, nano::test_genesis_key.pub, amount - 100, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest1)));
 
-	// Check confirmation heights before, should be uninitialized (1 for genesis).
-	nano::confirmation_height_info confirmation_height_info;
-	add_callback_stats (*node);
-	auto transaction = node->store.tx_begin_read ();
-	ASSERT_FALSE (node->store.confirmation_height_get (transaction, nano::test_genesis_key.pub, confirmation_height_info));
-	ASSERT_EQ (1, confirmation_height_info.height);
-	ASSERT_EQ (nano::genesis_hash, confirmation_height_info.frontier);
-
-	node->process_active (send1);
-	node->block_processor.flush ();
-
-	system.deadline_set (10s);
-	while (node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out) != 1)
-	{
-		ASSERT_NO_ERROR (system.poll ());
-	}
-
-	{
-		auto transaction = node->store.tx_begin_write ();
-		ASSERT_TRUE (node->ledger.block_confirmed (transaction, send1->hash ()));
+		// Check confirmation heights before, should be uninitialized (1 for genesis).
+		nano::confirmation_height_info confirmation_height_info;
+		add_callback_stats (*node);
+		auto transaction = node->store.tx_begin_read ();
 		ASSERT_FALSE (node->store.confirmation_height_get (transaction, nano::test_genesis_key.pub, confirmation_height_info));
-		ASSERT_EQ (2, confirmation_height_info.height);
-		ASSERT_EQ (send1->hash (), confirmation_height_info.frontier);
+		ASSERT_EQ (1, confirmation_height_info.height);
+		ASSERT_EQ (nano::genesis_hash, confirmation_height_info.frontier);
 
-		// Rollbacks should fail as these blocks have been cemented
-		ASSERT_TRUE (node->ledger.rollback (transaction, latest1));
-		ASSERT_TRUE (node->ledger.rollback (transaction, send1->hash ()));
-		ASSERT_EQ (1, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
-		ASSERT_EQ (1, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
-	}
+		node->process_active (send1);
+		node->block_processor.flush ();
+
+		system.deadline_set (10s);
+		while (node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out) != 1)
+		{
+			ASSERT_NO_ERROR (system.poll ());
+		}
+
+		{
+			auto transaction = node->store.tx_begin_write ();
+			ASSERT_TRUE (node->ledger.block_confirmed (transaction, send1->hash ()));
+			ASSERT_FALSE (node->store.confirmation_height_get (transaction, nano::test_genesis_key.pub, confirmation_height_info));
+			ASSERT_EQ (2, confirmation_height_info.height);
+			ASSERT_EQ (send1->hash (), confirmation_height_info.frontier);
+
+			// Rollbacks should fail as these blocks have been cemented
+			ASSERT_TRUE (node->ledger.rollback (transaction, latest1));
+			ASSERT_TRUE (node->ledger.rollback (transaction, send1->hash ()));
+			ASSERT_EQ (1, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+			ASSERT_EQ (1, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
+		}
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, multiple_accounts)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 	nano::keypair key1;
 	nano::keypair key2;
 	nano::keypair key3;
@@ -190,12 +200,19 @@ TEST (confirmation_height, multiple_accounts)
 	}
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, gap_bootstrap)
 {
-	nano::system system (1);
-	auto & node1 (*system.nodes[0]);
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
+	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
+	auto & node1 = *system.add_node (node_flags);
 	nano::genesis genesis;
 	nano::keypair destination;
 	auto send1 (std::make_shared<nano::state_block> (nano::genesis_account, genesis.hash (), nano::genesis_account, nano::genesis_amount - nano::Gxrb_ratio, destination.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, 0));
@@ -257,14 +274,21 @@ TEST (confirmation_height, gap_bootstrap)
 	}
 	ASSERT_EQ (0, node1.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 	ASSERT_EQ (0, node1.stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, gap_live)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node1 = system.add_node (node_config);
+	auto node1 = system.add_node (node_config, node_flags);
 	node_config.peering_port = nano::get_available_port ();
 	system.add_node (node_config);
 	nano::keypair destination;
@@ -336,14 +360,21 @@ TEST (confirmation_height, gap_live)
 		ASSERT_EQ (6, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 		ASSERT_EQ (6, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
 	}
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, send_receive_between_2_accounts)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 	nano::keypair key1;
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -413,14 +444,21 @@ TEST (confirmation_height, send_receive_between_2_accounts)
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
 	ASSERT_EQ (11, node->ledger.cache.cemented_count);
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, send_receive_self)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
 
@@ -469,14 +507,21 @@ TEST (confirmation_height, send_receive_self)
 	ASSERT_EQ (6, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 	ASSERT_EQ (6, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
 	ASSERT_EQ (confirmation_height_info.height, node->ledger.cache.cemented_count);
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, all_block_types)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
 	nano::keypair key1;
@@ -548,6 +593,11 @@ TEST (confirmation_height, all_block_types)
 	}
 
 	auto transaction (node->store.tx_begin_read ());
+	if (!node->ledger.block_confirmed (transaction, state_send2->hash ()))
+	{
+		bool cheese = false;
+	}
+
 	ASSERT_TRUE (node->ledger.block_confirmed (transaction, state_send2->hash ()));
 	nano::account_info account_info;
 	nano::confirmation_height_info confirmation_height_info;
@@ -572,17 +622,24 @@ TEST (confirmation_height, all_block_types)
 	ASSERT_EQ (15, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 	ASSERT_EQ (15, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
 	ASSERT_EQ (16, node->ledger.cache.cemented_count);
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 /* Bulk of the this test was taken from the node.fork_flip test */
 TEST (confirmation_height, conflict_rollback_cemented)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	boost::iostreams::stream_buffer<nano::stringstream_mt_sink> sb;
 	sb.open (nano::stringstream_mt_sink{});
 	nano::boost_log_cerr_redirect redirect_cerr (&sb);
-	nano::system system (2);
-	auto node1 (system.nodes[0]);
-	auto node2 (system.nodes[1]);
+	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
+	auto node1 = system.add_node (node_flags);
+	auto node2 = system.add_node (node_flags);
 	ASSERT_EQ (1, node1->network.size ());
 	nano::keypair key1;
 	nano::genesis genesis;
@@ -640,13 +697,20 @@ TEST (confirmation_height, conflict_rollback_cemented)
 	ASSERT_TRUE (node1->store.block_exists (transaction1, publish1.block->hash ()));
 	ASSERT_TRUE (node2->store.block_exists (transaction2, publish2.block->hash ()));
 	ASSERT_FALSE (node2->store.block_exists (transaction2, publish1.block->hash ()));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, observers)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	auto amount (std::numeric_limits<nano::uint128_t>::max ());
-	nano::system system (1);
-	auto node1 (system.nodes[0]);
+	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
+	auto node1 = system.add_node (node_flags);
 	nano::keypair key1;
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest1 (node1->latest (nano::test_genesis_key.pub));
@@ -665,15 +729,22 @@ TEST (confirmation_height, observers)
 	ASSERT_TRUE (node1->ledger.block_confirmed (transaction, send1->hash ()));
 	ASSERT_EQ (1, node1->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 	ASSERT_EQ (1, node1->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 // This tests when a read has been done, but the block no longer exists by the time a write is done
 TEST (confirmation_height, modified_chain)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -707,16 +778,23 @@ TEST (confirmation_height, modified_chain)
 	}
 
 	ASSERT_EQ (1, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::invalid_block, nano::stat::dir::in));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 namespace nano
 {
 TEST (confirmation_height, pending_observer_callbacks)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -743,10 +821,15 @@ TEST (confirmation_height, pending_observer_callbacks)
 
 	// Confirm the callback is not called under this circumstance because there is no election information
 	ASSERT_EQ (2, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, prioritize_frontiers)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
 	// Prevent frontiers being confirmed as it will affect the priorization checking
 	nano::node_config node_config (nano::get_available_port (), system.logging);
@@ -880,19 +963,26 @@ TEST (confirmation_height, prioritize_frontiers)
 	{
 		ASSERT_NE (node->active.roots.find (frontier), node->active.roots.end ());
 	}
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 }
 
 TEST (confirmation_height, frontiers_confirmation_mode)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::genesis genesis;
 	nano::keypair key;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	// Always mode
 	{
 		nano::system system;
 		nano::node_config node_config (nano::get_available_port (), system.logging);
 		node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::always;
-		auto node = system.add_node (node_config);
+		auto node = system.add_node (node_config, node_flags);
 		nano::state_block send (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *node->work_generate_blocking (genesis.hash ()));
 		{
 			auto transaction = node->store.tx_begin_write ();
@@ -909,7 +999,7 @@ TEST (confirmation_height, frontiers_confirmation_mode)
 		nano::system system;
 		nano::node_config node_config (nano::get_available_port (), system.logging);
 		node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::automatic;
-		auto node = system.add_node (node_config);
+		auto node = system.add_node (node_config, node_flags);
 		nano::state_block send (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *node->work_generate_blocking (genesis.hash ()));
 		{
 			auto transaction = node->store.tx_begin_write ();
@@ -926,7 +1016,7 @@ TEST (confirmation_height, frontiers_confirmation_mode)
 		nano::system system;
 		nano::node_config node_config (nano::get_available_port (), system.logging);
 		node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-		auto node = system.add_node (node_config);
+		auto node = system.add_node (node_config, node_flags);
 		nano::state_block send (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *node->work_generate_blocking (genesis.hash ()));
 		{
 			auto transaction = node->store.tx_begin_write ();
@@ -936,15 +1026,22 @@ TEST (confirmation_height, frontiers_confirmation_mode)
 		std::this_thread::sleep_for (std::chrono::seconds (1));
 		ASSERT_EQ (0, node->active.size ());
 	}
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 // The callback and confirmation history should only be updated after confirmation height is set (and not just after voting)
 TEST (confirmation_height, callback_confirmed_history)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -1024,16 +1121,23 @@ TEST (confirmation_height, callback_confirmed_history)
 	ASSERT_EQ (1, node->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_inactive, nano::stat::dir::out));
 
 	ASSERT_EQ (0, node->active.election_winner_details_size ());
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 namespace nano
 {
 TEST (confirmation_height, dependent_election)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -1089,15 +1193,22 @@ TEST (confirmation_height, dependent_election)
 	ASSERT_EQ (3, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
 
 	ASSERT_EQ (0, node->active.election_winner_details_size ());
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 // This test checks that a receive block with uncemented blocks below cements them too.
 TEST (confirmation_height, cemented_gap_below_receive)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -1158,16 +1269,23 @@ TEST (confirmation_height, cemented_gap_below_receive)
 	ASSERT_EQ (0, node->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_active_conf_height, nano::stat::dir::out));
 	ASSERT_EQ (9, node->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_inactive, nano::stat::dir::out));
 	ASSERT_EQ (10, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 // This test checks that a receive block with uncemented blocks below cements them too, compared with the test above, this
 // is the first write in this chain.
 TEST (confirmation_height, cemented_gap_below_no_cache)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -1235,14 +1353,21 @@ TEST (confirmation_height, cemented_gap_below_no_cache)
 	ASSERT_EQ (0, node->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_active_conf_height, nano::stat::dir::out));
 	ASSERT_EQ (5, node->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_inactive, nano::stat::dir::out));
 	ASSERT_EQ (6, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+		};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 
 TEST (confirmation_height, election_winner_details_clearing)
 {
+	auto test_mode = [](nano::confirmation_height_mode mode_a) {
 	nano::system system;
+	nano::node_flags node_flags;
+	node_flags.confirmation_height_processor_mode = mode_a;
 	nano::node_config node_config (nano::get_available_port (), system.logging);
 	node_config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node = system.add_node (node_config);
+	auto node = system.add_node (node_config, node_flags);
 
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
 	nano::block_hash latest (node->latest (nano::test_genesis_key.pub));
@@ -1310,5 +1435,9 @@ TEST (confirmation_height, election_winner_details_clearing)
 	ASSERT_EQ (2, node->stats.count (nano::stat::type::http_callback, nano::stat::detail::http_callback, nano::stat::dir::out));
 	ASSERT_EQ (1, node->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_active_quorum, nano::stat::dir::out));
 	ASSERT_EQ (3, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in));
+	};
+
+	test_mode (nano::confirmation_height_mode::bounded);
+	test_mode (nano::confirmation_height_mode::unbounded);
 }
 }
