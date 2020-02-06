@@ -1,7 +1,6 @@
 #include <nano/lib/stats.hpp>
 #include <nano/node/confirmation_height_processor.hpp>
 #include <nano/node/write_database_queue.hpp>
-
 #include <nano/secure/ledger.hpp>
 
 #include <numeric>
@@ -65,7 +64,7 @@ void nano::confirmation_height_processor::process_unbounded ()
 
 		auto count_before_receive = receive_source_pairs.size ();
 		std::vector<callback_data> block_callbacks_required;
-		auto already_traversed = iterated_height >= block_height; 
+		auto already_traversed = iterated_height >= block_height;
 		if (!already_traversed)
 		{
 			collect_unconfirmed_receive_and_sources_for_account_unbounded (block_height, iterated_height, current, account, read_transaction, receive_source_pairs, block_callbacks_required);
@@ -253,7 +252,7 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing_
 				}
 				else
 				{
-					block_callbacks_required = receive_details->send_callbacks_required;				
+					block_callbacks_required = receive_details->send_callbacks_required;
 				}
 
 				auto num_to_remove = block_callbacks_required.size () - num_blocks_confirmed;

@@ -437,7 +437,6 @@ bool nano::confirmation_height_processor::cement_blocks ()
 	return false;
 }
 
-
 nano::confirmation_height_processor::receive_chain_details::receive_chain_details (nano::account const & account_a, uint64_t height_a, nano::block_hash const & hash_a, nano::block_hash const & top_level_a, boost::optional<nano::block_hash> next_a, uint64_t bottom_height_a, nano::block_hash const & bottom_most_a) :
 account (account_a),
 height (height_a),
