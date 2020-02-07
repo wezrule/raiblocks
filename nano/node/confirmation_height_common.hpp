@@ -13,20 +13,22 @@
 
 namespace nano
 {
-	namespace confirmation_height
-	{
+namespace confirmation_height
+{
 	class callback_data final
 	{
 	public:
 		callback_data (std::shared_ptr<nano::block> const & block_a, nano::block_sideband const & sideband_a) :
-			block (block_a),
-			sideband (sideband_a) { }
+		block (block_a),
+		sideband (sideband_a)
+		{
+		}
 
 		std::shared_ptr<nano::block> block;
 		nano::block_sideband sideband;
 	};
 
-		/** The maximum amount of blocks to iterate over while writing */
-		uint64_t constexpr batch_write_size = 4096;
-	}
+	/** The maximum amount of blocks to iterate over while writing */
+	uint64_t constexpr batch_write_size = 4096;
+}
 }

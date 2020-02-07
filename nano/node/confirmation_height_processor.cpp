@@ -11,8 +11,8 @@
 #include <numeric>
 
 nano::confirmation_height_processor::confirmation_height_processor (nano::ledger & ledger_a, nano::write_database_queue & write_database_queue_a, std::chrono::milliseconds batch_separate_pending_min_time_a, nano::logger_mt & logger_a, confirmation_height_mode mode_a) :
-	ledger (ledger_a),
-	write_database_queue (write_database_queue_a),
+ledger (ledger_a),
+write_database_queue (write_database_queue_a),
 confirmation_height_bounded (ledger_a, write_database_queue_a, batch_separate_pending_min_time_a, logger_a, stopped, original_hash, [this](auto & cemented_blocks) { this->notify_observers (cemented_blocks); }, [this]() { return this->awaiting_processing_size (); }),
 confirmation_height_unbounded (ledger_a, write_database_queue_a, batch_separate_pending_min_time_a, logger_a, stopped, original_hash, [this](auto & cemented_blocks) { this->notify_observers (cemented_blocks); }, [this]() { return this->awaiting_processing_size (); }),
 thread ([this, mode_a]() {
@@ -84,7 +84,7 @@ void nano::confirmation_height_processor::run (confirmation_height_mode mode_a)
 			auto lock_and_cleanup = [&lk, this]() {
 				lk.lock ();
 				original_hash.clear ();
-				original_hashes_pending.clear ();			
+				original_hashes_pending.clear ();
 			};
 
 			lk.unlock ();

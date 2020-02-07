@@ -12,7 +12,7 @@ class write_database_queue;
 class confirmation_height_unbounded final
 {
 public:
-	confirmation_height_unbounded (nano::ledger &, nano::write_database_queue &, std::chrono::milliseconds, nano::logger_mt &, std::atomic<bool> &, nano::block_hash const &, std::function<void (std::vector<nano::confirmation_height::callback_data> const &)> const &, std::function<uint64_t()> const &);
+	confirmation_height_unbounded (nano::ledger &, nano::write_database_queue &, std::chrono::milliseconds, nano::logger_mt &, std::atomic<bool> &, nano::block_hash const &, std::function<void(std::vector<nano::confirmation_height::callback_data> const &)> const &, std::function<uint64_t ()> const &);
 	bool pending_empty () const;
 	void prepare_new ();
 	void process ();
@@ -93,7 +93,7 @@ private:
 	nano::logger_mt & logger;
 	std::atomic<bool> & stopped;
 	nano::block_hash const & original_hash;
-	std::function<void (std::vector<nano::confirmation_height::callback_data> const &)> notify_observers_callback;
+	std::function<void(std::vector<nano::confirmation_height::callback_data> const &)> notify_observers_callback;
 	std::function<uint64_t ()> awaiting_processing_size_callback;
 
 	friend std::unique_ptr<nano::container_info_component> collect_container_info (confirmation_height_unbounded &, const std::string & name_a);

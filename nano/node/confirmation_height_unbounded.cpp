@@ -5,15 +5,15 @@
 
 #include <numeric>
 
-nano::confirmation_height_unbounded::confirmation_height_unbounded (nano::ledger & ledger_a, nano::write_database_queue & write_database_queue_a, std::chrono::milliseconds batch_separate_pending_min_time_a, nano::logger_mt & logger_a, std::atomic<bool> & stopped_a, nano::block_hash const & original_hash_a, std::function<void (std::vector<nano::confirmation_height::callback_data> const &)> const & notify_observers_callback_a, std::function<uint64_t()> const & awaiting_processing_size_callback_a)
-	: ledger (ledger_a),
-	write_database_queue (write_database_queue_a),
-	batch_separate_pending_min_time (batch_separate_pending_min_time_a),
-	logger (logger_a),
-	stopped (stopped_a),
-	original_hash (original_hash_a),
-	notify_observers_callback (notify_observers_callback_a),
-	awaiting_processing_size_callback (awaiting_processing_size_callback_a)
+nano::confirmation_height_unbounded::confirmation_height_unbounded (nano::ledger & ledger_a, nano::write_database_queue & write_database_queue_a, std::chrono::milliseconds batch_separate_pending_min_time_a, nano::logger_mt & logger_a, std::atomic<bool> & stopped_a, nano::block_hash const & original_hash_a, std::function<void(std::vector<nano::confirmation_height::callback_data> const &)> const & notify_observers_callback_a, std::function<uint64_t ()> const & awaiting_processing_size_callback_a) :
+ledger (ledger_a),
+write_database_queue (write_database_queue_a),
+batch_separate_pending_min_time (batch_separate_pending_min_time_a),
+logger (logger_a),
+stopped (stopped_a),
+original_hash (original_hash_a),
+notify_observers_callback (notify_observers_callback_a),
+awaiting_processing_size_callback (awaiting_processing_size_callback_a)
 {
 }
 
