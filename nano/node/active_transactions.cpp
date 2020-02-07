@@ -30,7 +30,7 @@ thread ([this]() {
 })
 {
 	// Register a callback which will get called after a block is cemented
-	confirmation_height_processor.add_cemented_observer ([this](nano::confirmation_height_processor::callback_data const & callback_data) {
+	confirmation_height_processor.add_cemented_observer ([this](nano::confirmation_height::callback_data const & callback_data) {
 		this->block_cemented_callback (callback_data.block, callback_data.sideband);
 	});
 

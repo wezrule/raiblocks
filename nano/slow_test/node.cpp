@@ -469,7 +469,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 	}
 
 	// The number of frontiers should be more than the batch_write_size to test the amount of blocks confirmed is correct.
-	auto num_accounts = nano::confirmation_height_processor::batch_write_size * 2 + 50;
+	auto num_accounts = nano::confirmation_height::batch_write_size * 2 + 50;
 	nano::keypair last_keypair = nano::test_genesis_key;
 	auto last_open_hash = node->latest (nano::test_genesis_key.pub);
 	{
@@ -547,7 +547,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	auto num_accounts = nano::confirmation_height_processor::batch_write_size * 2 + 50;
+	auto num_accounts = nano::confirmation_height::batch_write_size * 2 + 50;
 	auto latest_genesis = node->latest (nano::test_genesis_key.pub);
 	std::vector<std::shared_ptr<nano::open_block>> open_blocks;
 	{
@@ -611,7 +611,7 @@ TEST (confirmation_height, long_chains)
 		node->active.next_frontier_check = std::chrono::steady_clock::now () + 7200s;
 	}
 
-	constexpr auto num_blocks = nano::confirmation_height_processor::batch_write_size * 2 + 50;
+	constexpr auto num_blocks = nano::confirmation_height::batch_write_size * 2 + 50;
 
 	// First open the other account
 	nano::send_block send (latest, key1.pub, nano::genesis_amount - nano::Gxrb_ratio + num_blocks + 1, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (latest));

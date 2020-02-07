@@ -1,6 +1,6 @@
 #include <nano/lib/logger_mt.hpp>
 #include <nano/lib/stats.hpp>
-#include <nano/node/confirmation_height_processor.hpp>
+#include <nano/node/confirmation_height_bounded.hpp>
 #include <nano/node/write_database_queue.hpp>
 #include <nano/secure/ledger.hpp>
 
@@ -8,13 +8,25 @@
 
 #include <numeric>
 
+nano::confirmation_height_bounded::confirmation_height_bounded (nano::ledger & ledger_a, nano::write_database_queue & write_database_queue_a, std::chrono::milliseconds batch_separate_pending_min_time_a, nano::logger_mt & logger_a, std::atomic<bool> & stopped_a, nano::block_hash const & original_hash_a, std::function<void (std::vector<nano::confirmation_height::callback_data> const &)> const & notify_observers_callback_a, std::function<uint64_t()> const & awaiting_processing_size_callback_a)
+	: ledger (ledger_a),
+	write_database_queue (write_database_queue_a),
+	batch_separate_pending_min_time (batch_separate_pending_min_time_a),
+	logger (logger_a),
+	original_hash (original_hash_a),
+	stopped (stopped_a),
+	notify_observers_callback (notify_observers_callback_a),
+	awaiting_processing_size_callback (awaiting_processing_size_callback_a)
+{
+}
+
 // The next block hash to iterate over, the priority is as follows:
 // 1 - The next block in the account chain for the last processed receive (if there is any)
 // 2 - The next receive block which is closest to genesis
 // 3 - The last checkpoint hit.
 // 4 - The hash that was passed in originally. Either all checkpoints were exhausted (this can happen when there are many accounts to genesis)
 //     or all other blocks have been processed.
-nano::confirmation_height_processor::top_and_next_hash nano::confirmation_height_processor::get_next_block (boost::optional<top_and_next_hash> const & next_in_receive_chain_a, boost::circular_buffer_space_optimized<nano::block_hash> const & checkpoints_a, boost::circular_buffer_space_optimized<receive_source_pair> const & receive_source_pairs, boost::optional<receive_chain_details> & receive_details_a)
+nano::confirmation_height_bounded::top_and_next_hash nano::confirmation_height_bounded::get_next_block (boost::optional<top_and_next_hash> const & next_in_receive_chain_a, boost::circular_buffer_space_optimized<nano::block_hash> const & checkpoints_a, boost::circular_buffer_space_optimized<receive_source_pair> const & receive_source_pairs, boost::optional<receive_chain_details> & receive_details_a)
 {
 	top_and_next_hash next;
 	if (next_in_receive_chain_a.is_initialized ())
@@ -39,7 +51,7 @@ nano::confirmation_height_processor::top_and_next_hash nano::confirmation_height
 	return next;
 }
 
-void nano::confirmation_height_processor::process ()
+void nano::confirmation_height_bounded::process ()
 {
 	nano::block_sideband sideband;
 	nano::confirmation_height_info confirmation_height_info;
@@ -135,12 +147,12 @@ void nano::confirmation_height_processor::process ()
 				return total += write_details_a.top_height - write_details_a.bottom_height + 1;
 			});
 
-			auto max_batch_write_size_reached = (total_pending_write_block_count >= batch_write_size);
+			auto max_batch_write_size_reached = (total_pending_write_block_count >= confirmation_height::batch_write_size);
 			// When there are a lot of pending confirmation height blocks, it is more efficient to
 			// bulk some of them up to enable better write performance which becomes the bottleneck.
 			auto min_time_exceeded = (timer.since_start () >= batch_separate_pending_min_time);
 			auto finished_iterating = current == original_hash;
-			auto non_awaiting_processing = awaiting_processing_size () == 0;
+			auto non_awaiting_processing = awaiting_processing_size_callback () == 0;
 			auto should_output = finished_iterating && (non_awaiting_processing || min_time_exceeded);
 			auto force_write = pending_writes.size () >= pending_writes_max_size || accounts_confirmed_info.size () >= pending_writes_max_size;
 
@@ -173,7 +185,7 @@ void nano::confirmation_height_processor::process ()
 	assert (checkpoints.empty ());
 }
 
-nano::block_hash nano::confirmation_height_processor::get_least_unconfirmed_hash_from_top_level (nano::transaction const & transaction_a, nano::block_hash const & hash_a, nano::account const & account_a, nano::confirmation_height_info const & confirmation_height_info_a, uint64_t & block_height_a)
+nano::block_hash nano::confirmation_height_bounded::get_least_unconfirmed_hash_from_top_level (nano::transaction const & transaction_a, nano::block_hash const & hash_a, nano::account const & account_a, nano::confirmation_height_info const & confirmation_height_info_a, uint64_t & block_height_a)
 {
 	nano::block_hash least_unconfirmed_hash = hash_a;
 	nano::block_sideband sideband;
@@ -197,7 +209,7 @@ nano::block_hash nano::confirmation_height_processor::get_least_unconfirmed_hash
 	return least_unconfirmed_hash;
 }
 
-bool nano::confirmation_height_processor::iterate (nano::read_transaction const & transaction_a, uint64_t bottom_height_a, nano::block_hash const & bottom_hash_a, boost::circular_buffer_space_optimized<nano::block_hash> & checkpoints_a, nano::block_hash & top_most_non_receive_block_hash_a, nano::block_hash const & top_level_hash_a, boost::circular_buffer_space_optimized<receive_source_pair> & receive_source_pairs_a, nano::account const & account_a)
+bool nano::confirmation_height_bounded::iterate (nano::read_transaction const & transaction_a, uint64_t bottom_height_a, nano::block_hash const & bottom_hash_a, boost::circular_buffer_space_optimized<nano::block_hash> & checkpoints_a, nano::block_hash & top_most_non_receive_block_hash_a, nano::block_hash const & top_level_hash_a, boost::circular_buffer_space_optimized<receive_source_pair> & receive_source_pairs_a, nano::account const & account_a)
 {
 	bool reached_target = false;
 	bool hit_receive = false;
@@ -254,7 +266,7 @@ bool nano::confirmation_height_processor::iterate (nano::read_transaction const 
 
 // Once the path to genesis has been iterated to, we can begin to cement the lowest blocks in the accounts. This sets up
 // the non-receive blocks which have been iterated for an account, and the associated receive block.
-void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing (preparation_data & preparation_data_a)
+void nano::confirmation_height_bounded::prepare_iterated_blocks_for_cementing (preparation_data & preparation_data_a)
 {
 	if (!preparation_data_a.already_cemented)
 	{
@@ -310,11 +322,11 @@ void nano::confirmation_height_processor::prepare_iterated_blocks_for_cementing 
 	}
 }
 
-bool nano::confirmation_height_processor::cement_blocks ()
+bool nano::confirmation_height_bounded::cement_blocks ()
 {
 	// Will contain all blocks that have been cemented (bounded by batch_write_size)
 	// and will get run through the cemented observer callback
-	std::vector<callback_data> cemented_blocks;
+	std::vector<confirmation_height::callback_data> cemented_blocks;
 	{
 		// This only writes to the confirmation_height table and is the only place to do so in a single process
 		auto transaction (ledger.store.tx_begin_write ({}, { nano::tables::confirmation_height }));
@@ -388,13 +400,13 @@ bool nano::confirmation_height_processor::cement_blocks ()
 					cemented_blocks.emplace_back (block, sideband);
 
 					// We have likely hit a long chain, flush these callbacks and continue
-					if (cemented_blocks.size () == batch_write_size)
+					if (cemented_blocks.size () == confirmation_height::batch_write_size)
 					{
 						auto num_blocks_cemented = num_blocks_iterated - total_blocks_cemented + 1;
 						total_blocks_cemented += num_blocks_cemented;
 						write_confirmation_height (num_blocks_cemented, start_height + total_blocks_cemented - 1, new_cemented_frontier);
 						transaction.commit ();
-						notify_observers (cemented_blocks);
+						notify_observers_callback (cemented_blocks);
 						cemented_blocks.clear ();
 						transaction.renew ();
 					}
@@ -428,16 +440,26 @@ bool nano::confirmation_height_processor::cement_blocks ()
 		}
 	}
 
-	notify_observers (cemented_blocks);
+	notify_observers_callback (cemented_blocks);
 
 	assert (pending_writes.empty ());
 	assert (pending_writes_size == 0);
-	nano::lock_guard<std::mutex> guard (mutex);
-	original_hashes_pending.clear ();
 	return false;
 }
 
-nano::confirmation_height_processor::receive_chain_details::receive_chain_details (nano::account const & account_a, uint64_t height_a, nano::block_hash const & hash_a, nano::block_hash const & top_level_a, boost::optional<nano::block_hash> next_a, uint64_t bottom_height_a, nano::block_hash const & bottom_most_a) :
+bool nano::confirmation_height_bounded::pending_empty () const
+{
+	return pending_writes.empty ();
+}
+
+void nano::confirmation_height_bounded::prepare_new ()
+{
+	accounts_confirmed_info.clear ();
+	accounts_confirmed_info_size = 0;
+	timer.restart ();
+}
+
+nano::confirmation_height_bounded::receive_chain_details::receive_chain_details (nano::account const & account_a, uint64_t height_a, nano::block_hash const & hash_a, nano::block_hash const & top_level_a, boost::optional<nano::block_hash> next_a, uint64_t bottom_height_a, nano::block_hash const & bottom_most_a) :
 account (account_a),
 height (height_a),
 hash (hash_a),
@@ -448,7 +470,7 @@ bottom_most (bottom_most_a)
 {
 }
 
-nano::confirmation_height_processor::write_details::write_details (nano::account const & account_a, uint64_t bottom_height_a, nano::block_hash const & bottom_hash_a, uint64_t top_height_a, nano::block_hash const & top_hash_a) :
+nano::confirmation_height_bounded::write_details::write_details (nano::account const & account_a, uint64_t bottom_height_a, nano::block_hash const & bottom_hash_a, uint64_t top_height_a, nano::block_hash const & top_hash_a) :
 bottom_height (bottom_height_a),
 bottom_hash (bottom_hash_a),
 top_height (top_height_a),
@@ -457,14 +479,22 @@ account (account_a)
 {
 }
 
-nano::confirmation_height_processor::receive_source_pair::receive_source_pair (confirmation_height_processor::receive_chain_details const & receive_details_a, const block_hash & source_a) :
+nano::confirmation_height_bounded::receive_source_pair::receive_source_pair (confirmation_height_bounded::receive_chain_details const & receive_details_a, const block_hash & source_a) :
 receive_details (receive_details_a),
 source_hash (source_a)
 {
 }
 
-nano::confirmation_height_processor::confirmed_info::confirmed_info (uint64_t confirmed_height_a, nano::block_hash const & iterated_frontier_a) :
+nano::confirmation_height_bounded::confirmed_info::confirmed_info (uint64_t confirmed_height_a, nano::block_hash const & iterated_frontier_a) :
 confirmed_height (confirmed_height_a),
 iterated_frontier (iterated_frontier_a)
 {
+}
+
+std::unique_ptr<nano::container_info_component> nano::collect_container_info (confirmation_height_bounded & confirmation_height_bounded, const std::string & name_a)
+{
+	auto composite = std::make_unique<container_info_composite> (name_a);
+	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "pending_writes", confirmation_height_bounded.pending_writes_size, sizeof (decltype (confirmation_height_bounded.pending_writes)::value_type) }));
+	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "accounts_confirmed_info", confirmation_height_bounded.accounts_confirmed_info_size, sizeof (decltype (confirmation_height_bounded.accounts_confirmed_info)::value_type) }));
+	return composite;
 }
