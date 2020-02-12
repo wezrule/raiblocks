@@ -13,7 +13,7 @@
 
 namespace boost
 {
-	class latch;
+class latch;
 }
 namespace nano
 {
