@@ -79,24 +79,24 @@ public:
    a total global ordering of atomic operations are well as synchronization between threads. Weaker memory
    ordering can provide benefits in some circumstances, such like in dumb counters where no other data is
    dependent on the ordering of these operations. */
-template<typename T>
+template <typename T>
 class relaxed_atomic_integral
 {
 public:
-	relaxed_atomic_integral() noexcept = default;
-	constexpr relaxed_atomic_integral(T desired) noexcept
-		: atomic (desired)
+	relaxed_atomic_integral () noexcept = default;
+	constexpr relaxed_atomic_integral (T desired) noexcept :
+	atomic (desired)
 	{
 	}
 
-	T operator=(T desired) noexcept
+	T operator= (T desired) noexcept
 	{
 		store (desired);
 		return atomic;
 	}
-	
+
 	relaxed_atomic_integral (relaxed_atomic_integral const &) = delete;
-	relaxed_atomic_integral& operator=(relaxed_atomic_integral const&) = delete;
+	relaxed_atomic_integral & operator= (relaxed_atomic_integral const &) = delete;
 
 	void store (T desired, std::memory_order order = std::memory_order_relaxed) noexcept
 	{
@@ -113,12 +113,12 @@ public:
 		return load ();
 	}
 
-	bool compare_exchange_weak (T& expected, T desired, std::memory_order order = std::memory_order_relaxed) noexcept
+	bool compare_exchange_weak (T & expected, T desired, std::memory_order order = std::memory_order_relaxed) noexcept
 	{
 		return atomic.compare_exchange_weak (expected, desired, order);
 	}
 
-	bool compare_exchange_strong (T& expected, T desired, std::memory_order order = std::memory_order_relaxed) noexcept
+	bool compare_exchange_strong (T & expected, T desired, std::memory_order order = std::memory_order_relaxed) noexcept
 	{
 		return atomic.compare_exchange_weak (expected, desired, order);
 	}

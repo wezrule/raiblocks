@@ -130,7 +130,7 @@ TEST (relaxed_atomic_integral, basic)
 	atomic.store (3);
 	ASSERT_EQ (3, atomic);
 
-	uint32_t expected{2};
+	uint32_t expected{ 2 };
 	ASSERT_FALSE (atomic.compare_exchange_strong (expected, 1));
 	ASSERT_EQ (3, expected);
 	ASSERT_EQ (3, atomic);
@@ -139,7 +139,7 @@ TEST (relaxed_atomic_integral, basic)
 	ASSERT_EQ (3, expected);
 
 	// Weak can fail spuriously, try a few times
-	bool res{false };
+	bool res{ false };
 	for (int i = 0; i < 1000; ++i)
 	{
 		res |= atomic.compare_exchange_weak (expected, 2);
@@ -156,7 +156,7 @@ TEST (relaxed_atomic_integral, many_threads)
 	nano::relaxed_atomic_integral<uint32_t> atomic{ 0 };
 	for (int i = 0; i < num; ++i)
 	{
-		threads.emplace_back([&atomic] {
+		threads.emplace_back ([&atomic] {
 			for (int i = 0; i < 10000; ++i)
 			{
 				++atomic;
