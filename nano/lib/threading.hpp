@@ -135,8 +135,7 @@ public:
 
 	T operator++ () noexcept
 	{
-		fetch_add (1);
-		return atomic;
+		return fetch_add (1) + 1;
 	}
 
 	T operator++ (int) noexcept
@@ -146,8 +145,7 @@ public:
 
 	T operator-- () noexcept
 	{
-		fetch_sub (1);
-		return atomic;
+		return fetch_sub (1) - 1;
 	}
 
 	T operator-- (int) noexcept

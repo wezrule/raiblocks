@@ -148,3 +148,32 @@ TEST (relaxed_atomic_integral, basic)
 	ASSERT_TRUE (res);
 	ASSERT_EQ (2, atomic);
 }
+
+TEST (relaxed_atomic_integral, many_threads)
+{
+	std::vector<std::thread> threads;
+	auto num = 4;
+	nano::relaxed_atomic_integral<uint32_t> atomic{ 0 };
+	for (int i = 0; i < num; ++i)
+	{
+		threads.emplace_back([&atomic] {
+			for (int i = 0; i < 10000; ++i)
+			{
+				++atomic;
+				atomic--;
+				atomic++;
+				--atomic;
+				atomic.fetch_add (2);
+				atomic.fetch_sub (2);
+			}
+		});
+	}
+
+	for (auto & thread : threads)
+	{
+		thread.join ();
+	}
+
+	// Check values
+	ASSERT_EQ (0, atomic);
+}
