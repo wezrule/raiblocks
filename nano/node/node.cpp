@@ -103,7 +103,7 @@ store (*store_impl),
 wallets_store_impl (std::make_unique<nano::mdb_wallets_store> (application_path_a / "wallets.ldb", config_a.lmdb_config)),
 wallets_store (*wallets_store_impl),
 gap_cache (*this),
-ledger (store, stats, flags_a.generate_cache),
+ledger (store, stats, flags_a.generate_cache, [this]() { this->network.erase_below_version (network_params.protocol.protocol_version_min (true)); }),
 checker (config.signature_checker_threads),
 network (*this, config.peering_port),
 telemetry (std::make_shared<nano::telemetry> (network, alarm, worker, observers.telemetry, stats, network_params, flags.disable_ongoing_telemetry_requests)),
@@ -864,6 +864,20 @@ void nano::node::ongoing_peer_store ()
 	bool stored (network.tcp_channels.store_all (true));
 	network.udp_channels.store_all (!stored);
 	std::weak_ptr<nano::node> node_w (shared_from_this ());
+
+	if (network.size () > 5)
+	{
+		if (!ledger.cache.epoch_2_started)
+		{
+			ledger.cache.epoch_2_started.store (true);
+			// The first epoch 2 block has been seen
+			if (ledger.epoch_2_started_cb)
+			{
+				ledger.epoch_2_started_cb ();
+			}
+		}
+	}
+
 	alarm.add (std::chrono::steady_clock::now () + network_params.node.peer_interval, [node_w]() {
 		if (auto node_l = node_w.lock ())
 		{
