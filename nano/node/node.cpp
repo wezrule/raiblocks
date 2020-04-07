@@ -864,20 +864,6 @@ void nano::node::ongoing_peer_store ()
 	bool stored (network.tcp_channels.store_all (true));
 	network.udp_channels.store_all (!stored);
 	std::weak_ptr<nano::node> node_w (shared_from_this ());
-
-	if (network.size () > 5)
-	{
-		if (!ledger.cache.epoch_2_started)
-		{
-			ledger.cache.epoch_2_started.store (true);
-			// The first epoch 2 block has been seen
-			if (ledger.epoch_2_started_cb)
-			{
-				ledger.epoch_2_started_cb ();
-			}
-		}
-	}
-
 	alarm.add (std::chrono::steady_clock::now () + network_params.node.peer_interval, [node_w]() {
 		if (auto node_l = node_w.lock ())
 		{

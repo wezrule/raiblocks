@@ -182,14 +182,14 @@ std::unique_ptr<nano::state_block> nano::upgrade_epoch (nano::work_pool & pool_a
 	nano::state_block_builder builder;
 	std::error_code ec;
 	auto epoch = builder
-	.account (nano::test_genesis_key.pub)
-	.previous (latest)
-	.balance (balance)
-	.link (ledger_a.epoch_link (epoch_a))
-	.representative (nano::test_genesis_key.pub)
-	.sign (nano::test_genesis_key.prv, nano::test_genesis_key.pub)
-	.work (*pool_a.generate (latest, nano::work_threshold (nano::work_version::work_1, nano::block_details (epoch_a, false, false, true))))
-	.build (ec);
+	             .account (nano::test_genesis_key.pub)
+	             .previous (latest)
+	             .balance (balance)
+	             .link (ledger_a.epoch_link (epoch_a))
+	             .representative (nano::test_genesis_key.pub)
+	             .sign (nano::test_genesis_key.prv, nano::test_genesis_key.pub)
+	             .work (*pool_a.generate (latest, nano::work_threshold (nano::work_version::work_1, nano::block_details (epoch_a, false, false, true))))
+	             .build (ec);
 
 	bool error { true };
 	if (!ec && epoch)

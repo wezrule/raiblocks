@@ -696,12 +696,11 @@ void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<n
 						else
 						{
 							// Version of channel is not high enough, just abort. Don't fallback to udp, instead cleanup attempt
-							cleanup_and_udp_fallback (endpoint_a, callback_a);
-//							cleanup_node_id_handshake_socket (endpoint_a, callback_a);
-//							{
-//								nano::lock_guard<std::mutex> lock (node_l->network.tcp_channels.mutex);
-//								node_l->network.tcp_channels.attempts.get<endpoint_tag> ().erase (nano::transport::map_endpoint_to_tcp (endpoint_a));
-//							}
+							cleanup_node_id_handshake_socket (endpoint_a, callback_a);
+							{
+								nano::lock_guard<std::mutex> lock (node_l->network.tcp_channels.mutex);
+								node_l->network.tcp_channels.attempts.get<endpoint_tag> ().erase (nano::transport::map_endpoint_to_tcp (endpoint_a));
+							}
 						}
 					}
 					else
