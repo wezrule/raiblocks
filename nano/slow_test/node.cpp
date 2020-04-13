@@ -531,7 +531,7 @@ TEST (confirmation_height, many_accounts_single_confirmation)
 	ASSERT_EQ (node->active.election_winner_details_size (), 0);
 }
 
-// Can take up to 10 minutes
+// Can take up to 20 minutes on Windows/Debug
 TEST (confirmation_height, many_accounts_many_confirmations)
 {
 	nano::system system;
@@ -566,7 +566,7 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 		node->block_confirm (open_block);
 	}
 
-	system.deadline_set (600s);
+	system.deadline_set (1200s);
 	while (node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in) != (num_accounts - 1) * 2)
 	{
 		ASSERT_NO_ERROR (system.poll ());
@@ -576,6 +576,12 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 	ASSERT_GE (num_confirmed_bounded, nano::confirmation_height::batch_write_size);
 	ASSERT_EQ (node->ledger.stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed_unbounded, nano::stat::dir::in), (num_accounts - 1) * 2 - num_confirmed_bounded);
 
+	system.deadline_set (20s);
+	while ((node->ledger.cache.cemented_count - 1) != node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out))
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+
 	auto transaction = node->store.tx_begin_read ();
 	auto cemented_count = 0;
 	for (auto i (node->ledger.store.confirmation_height_begin (transaction)), n (node->ledger.store.confirmation_height_end ()); i != n; ++i)
@@ -584,13 +590,6 @@ TEST (confirmation_height, many_accounts_many_confirmations)
 	}
 
 	ASSERT_EQ (cemented_count, node->ledger.cache.cemented_count);
-
-	system.deadline_set (20s);
-	while ((node->ledger.cache.cemented_count - 1) != node->stats.count (nano::stat::type::observer, nano::stat::detail::all, nano::stat::dir::out))
-	{
-		ASSERT_NO_ERROR (system.poll ());
-	}
-
 	ASSERT_EQ (node->active.election_winner_details_size (), 0);
 }
 
