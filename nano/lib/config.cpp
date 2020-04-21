@@ -20,7 +20,7 @@ work_thresholds const network_constants::publish_beta (
 );
 
 work_thresholds const network_constants::publish_test (
-0xfe00000000000000, // Very low for tests
+0x1000000000000000, // Very low for tests
 0xffc0000000000000, // 8x higher than epoch_1
 0xf000000000000000 // 8x lower than epoch_1
 );
