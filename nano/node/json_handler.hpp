@@ -34,6 +34,7 @@ public:
 	void account_info ();
 	void account_key ();
 	void account_list ();
+	void election_winner_details ();
 	void account_move ();
 	void account_remove ();
 	void account_representative ();

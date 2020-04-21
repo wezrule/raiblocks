@@ -796,6 +796,17 @@ void nano::active_transactions::update_adjusted_multiplier ()
 	}
 }
 
+std::vector<nano::block_hash> nano::active_transactions::get_election_winner_details ()
+{
+	nano::lock_guard<std::mutex> guard (election_winner_details_mutex);
+	std::vector<nano::block_hash> vec;
+	vec.reserve (election_winner_details.size ());
+	std::transform (election_winner_details.begin (), election_winner_details.end (), std::back_inserter (vec), [](auto const & election_winner_detail) {
+		return election_winner_detail.first;
+	});
+	return vec;
+}
+
 void nano::active_transactions::update_active_multiplier (nano::unique_lock<std::mutex> & lock_a)
 {
 	debug_assert (!mutex.try_lock ());
@@ -971,6 +982,8 @@ boost::optional<nano::election_status_type> nano::active_transactions::confirm_b
 		}
 		else
 		{
+			std::cout << "No winner: " << block_a->hash ().to_string () << std::endl;
+			node.logger.always_log ("No winner: ", block_a->hash ().to_string ());
 			status_type = boost::optional<nano::election_status_type>{};
 		}
 	}

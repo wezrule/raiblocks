@@ -56,6 +56,11 @@ void nano::election::confirm_once (nano::election_status_type type_a)
 		auto confirmation_action_l (confirmation_action);
 		auto this_l = shared_from_this ();
 		debug_assert (node.active.election_winner_details.find (status.winner->hash ()) == node.active.election_winner_details.cend ());
+		if (node.active.election_winner_details.find (status.winner->hash ()) != node.active.election_winner_details.cend ())
+		{
+			std::cout << "DUPLICATE ELECTIONS!" << std::endl;
+			node.logger.always_log ("DUPLICATE ELECTION", status.winner->hash ().to_string ());
+		}
 		node.active.election_winner_details.emplace (status.winner->hash (), this_l);
 		node.active.add_recently_confirmed (status_l.winner->qualified_root (), status_l.winner->hash ());
 		node_l->process_confirmed (status_l, this_l);

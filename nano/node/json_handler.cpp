@@ -185,6 +185,26 @@ std::shared_ptr<nano::wallet> nano::json_handler::wallet_impl ()
 	return nullptr;
 }
 
+void nano::json_handler::election_winner_details ()
+{
+	if (!ec)
+	{
+		auto election_winner_detail_hashes = node.active.get_election_winner_details ();
+		if (!ec)
+		{
+			boost::property_tree::ptree election_winner_details;
+			for (auto & hash : election_winner_detail_hashes)
+			{
+				boost::property_tree::ptree entry;
+				entry.put ("", hash.to_string ());
+				election_winner_details.push_back (std::make_pair ("", entry));
+			}
+			response_l.add_child ("election_winner_detail_hashes", election_winner_details);
+		}
+	}
+	response_errors ();
+}
+
 bool nano::json_handler::wallet_locked_impl (nano::transaction const & transaction_a, std::shared_ptr<nano::wallet> wallet_a)
 {
 	bool result (false);
@@ -5082,6 +5102,7 @@ ipc_json_handler_no_arg_func_map create_ipc_json_handler_no_arg_func_map ()
 	no_arg_funcs.emplace ("delegators", &nano::json_handler::delegators);
 	no_arg_funcs.emplace ("delegators_count", &nano::json_handler::delegators_count);
 	no_arg_funcs.emplace ("deterministic_key", &nano::json_handler::deterministic_key);
+	no_arg_funcs.emplace ("election_winner_details", &nano::json_handler::election_winner_details);
 	no_arg_funcs.emplace ("epoch_upgrade", &nano::json_handler::epoch_upgrade);
 	no_arg_funcs.emplace ("frontiers", &nano::json_handler::frontiers);
 	no_arg_funcs.emplace ("frontier_count", &nano::json_handler::account_count);

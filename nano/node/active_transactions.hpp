@@ -122,6 +122,7 @@ public:
 	void add_adjust_difficulty (nano::block_hash const &);
 	void update_adjusted_multiplier ();
 	void update_active_multiplier (nano::unique_lock<std::mutex> &);
+	std::vector<nano::block_hash> get_election_winner_details ();
 	uint64_t active_difficulty ();
 	uint64_t limited_active_difficulty (nano::block const &);
 	uint64_t limited_active_difficulty (nano::work_version const, uint64_t const);
