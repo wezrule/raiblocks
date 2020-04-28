@@ -139,7 +139,9 @@ void nano::network::send_keepalive (std::shared_ptr<nano::transport::channel> ch
 {
 	nano::keepalive message;
 	random_fill (message.peers);
-	channel_a->send (message);
+	channel_a->send (message, []() {
+		std::cout << "Keepalive sent" << std::endl;	
+	);
 }
 
 void nano::network::send_keepalive_self (std::shared_ptr<nano::transport::channel> channel_a)
