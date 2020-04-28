@@ -1128,5 +1128,5 @@ TEST (network, tcp_no_connect_excluded_peers)
 	// Ensure a successful connection
 	ASSERT_EQ (0, node0->network.size ());
 	node1->network.merge_peer (node0->network.endpoint ());
-	ASSERT_TIMELY (5s, node0->network.size () == 1);
+	ASSERT_TIMELY (10s, node0->network.size () == 1);
 }
