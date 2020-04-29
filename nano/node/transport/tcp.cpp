@@ -366,7 +366,6 @@ bool nano::transport::tcp_channels::reachout (nano::endpoint const & endpoint_a)
 	auto tcp_endpoint (nano::transport::map_endpoint_to_tcp (endpoint_a));
 	// Don't overload single IP
 	bool error = node.network.excluded_peers.check (tcp_endpoint) || max_ip_connections (tcp_endpoint);
-	std::cout << "Is in excluded peers list" << std::endl;
 	if (!error && !node.flags.disable_tcp_realtime)
 	{
 		// Don't keepalive to nodes that already sent us something
@@ -374,6 +373,10 @@ bool nano::transport::tcp_channels::reachout (nano::endpoint const & endpoint_a)
 		nano::lock_guard<std::mutex> lock (mutex);
 		auto inserted (attempts.emplace (tcp_endpoint));
 		error |= !inserted.second;
+	}
+	else
+	{
+		std::cout << "Is in excluded peers list" << std::endl;
 	}
 	return error;
 }
