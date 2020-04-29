@@ -1,49 +1,7 @@
 add_executable (core_test
 	core_test_main.cc
 	testutil.hpp
-	fakes/websocket_client.hpp
-	fakes/work_peer.hpp
-	active_transactions.cpp
-	block.cpp
-	block_store.cpp
-	bootstrap.cpp
-	cli.cpp
-	common.hpp
-	confirmation_height.cpp
-	confirmation_solicitor.cpp
-	conflicts.cpp
-	difficulty.cpp
-	distributed_work.cpp
-	election.cpp
-	entry.cpp
-	epochs.cpp
-	gap_cache.cpp
-	ipc.cpp
-	ledger.cpp
-	locks.cpp
-	logger.cpp
-	message.cpp
-	message_parser.cpp
-	memory_pool.cpp
-	network.cpp
-	network_filter.cpp
-	node.cpp
-	node_telemetry.cpp
-	processor_service.cpp
-	peer_container.cpp
-	request_aggregator.cpp
-	signing.cpp
-	socket.cpp
-	toml.cpp
-	timer.cpp
-	uint256_union.cpp
-	utility.cpp
-	versioning.cpp
-	vote_processor.cpp
-	wallet.cpp
-	wallets.cpp
-	websocket.cpp
-	work_pool.cpp)
+	network.cpp)
 
 target_compile_definitions(core_test
 		PRIVATE
