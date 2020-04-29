@@ -565,6 +565,7 @@ void nano::network::merge_peer (nano::endpoint const & peer_a)
 {
 	if (!reachout (peer_a, node.config.allow_local_peers))
 	{
+		std::cout << "Before start tcp from merge_peer" << std::endl;
 		std::weak_ptr<nano::node> node_w (node.shared ());
 		node.network.tcp_channels.start_tcp (peer_a, [node_w](std::shared_ptr<nano::transport::channel> channel_a) {
 			if (auto node_l = node_w.lock ())

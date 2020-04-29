@@ -433,8 +433,6 @@ if (NANO_TEST OR RAIBLOCKS_TEST)
 		set (gtest_force_shared_crt OFF)
 	endif()
 
-	add_subdirectory(nano/load_test)
-
 	add_subdirectory (gtest/googletest)
 	# FIXME: This fixes gtest include directories without modifying gtest's
 	# CMakeLists.txt. Ideally we should use GTest::GTest and GTest::Main as
@@ -443,8 +441,6 @@ if (NANO_TEST OR RAIBLOCKS_TEST)
 		"${CMAKE_SOURCE_DIR}/gtest/googletest/include")
 
 	add_subdirectory(nano/core_test)
-	add_subdirectory(nano/rpc_test)
-	add_subdirectory(nano/slow_test)
 endif ()
 if (NANO_GUI OR RAIBLOCKS_GUI)
 	install (FILES ${PROJECT_BINARY_DIR}/config-node.toml.sample DESTINATION .)
@@ -520,16 +516,6 @@ if (NANO_GUI OR RAIBLOCKS_GUI)
 	target_link_libraries (qt_system qt node Qt5::Gui Qt5::Widgets)
 
 	set_target_properties (qt nano_wallet qt_system PROPERTIES COMPILE_FLAGS "-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
-
-	if (NANO_TEST OR RAIBLOCKS_TEST)
-		add_executable (qt_test
-			nano/qt_test/entry.cpp
-			nano/qt_test/qt.cpp)
-
-		target_link_libraries(qt_test gtest gtest_main qt Qt5::Test)
-
-		set_target_properties (qt_test PROPERTIES COMPILE_FLAGS "-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
-	endif ()
 
 	if (APPLE)
 		set (CPACK_GENERATOR "DragNDrop")
