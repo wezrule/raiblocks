@@ -1541,6 +1541,8 @@ TEST (node, fork_open)
 
 TEST (node, fork_open_flip)
 {
+	for (int i = 0; i < 100l ++i)
+	{
 	nano::system system (2);
 	auto & node1 (*system.nodes[0]);
 	auto & node2 (*system.nodes[1]);
@@ -1598,6 +1600,7 @@ TEST (node, fork_open_flip)
 	ASSERT_TRUE (node1.store.block_exists (transaction1, open1->hash ()));
 	ASSERT_TRUE (node2.store.block_exists (transaction2, open1->hash ()));
 	ASSERT_FALSE (node2.store.block_exists (transaction2, open2->hash ()));
+	}
 }
 
 TEST (node, coherent_observer)
