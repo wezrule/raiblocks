@@ -1541,7 +1541,7 @@ TEST (node, fork_open)
 
 TEST (node, fork_open_flip)
 {
-	for (int i = 0; i < 100l ++i)
+	for (int i = 0; i < 100; ++i)
 	{
 	nano::system system (2);
 	auto & node1 (*system.nodes[0]);
