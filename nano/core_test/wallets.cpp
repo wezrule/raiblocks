@@ -1,7 +1,6 @@
-#include <nano/core_test/testutil.hpp>
-#include <nano/node/node.hpp>
 #include <nano/node/testing.hpp>
 #include <nano/secure/versioning.hpp>
+#include <nano/test_common/testutil.hpp>
 
 #include <gtest/gtest.h>
 
@@ -160,7 +159,7 @@ TEST (wallets, reload)
 	ASSERT_EQ (1, node1.wallets.items.size ());
 	{
 		nano::lock_guard<std::mutex> lock_wallet (node1.wallets.mutex);
-		nano::inactive_node node (node1.application_path);
+		nano::inactive_node node (node1.application_path, nano::inactive_node_flag_defaults ());
 		auto wallet (node.node->wallets.create (one));
 		ASSERT_NE (wallet, nullptr);
 	}
@@ -195,4 +194,29 @@ TEST (wallets, vote_minimum)
 	wallet->insert_adhoc (key2.prv);
 	node1.wallets.compute_reps ();
 	ASSERT_EQ (2, wallet->representatives.size ());
+}
+
+TEST (wallets, exists)
+{
+	nano::system system (1);
+	auto & node (*system.nodes[0]);
+	nano::keypair key1;
+	nano::keypair key2;
+	{
+		auto transaction (node.wallets.tx_begin_read ());
+		ASSERT_FALSE (node.wallets.exists (transaction, key1.pub));
+		ASSERT_FALSE (node.wallets.exists (transaction, key2.pub));
+	}
+	system.wallet (0)->insert_adhoc (key1.prv);
+	{
+		auto transaction (node.wallets.tx_begin_read ());
+		ASSERT_TRUE (node.wallets.exists (transaction, key1.pub));
+		ASSERT_FALSE (node.wallets.exists (transaction, key2.pub));
+	}
+	system.wallet (0)->insert_adhoc (key2.prv);
+	{
+		auto transaction (node.wallets.tx_begin_read ());
+		ASSERT_TRUE (node.wallets.exists (transaction, key1.pub));
+		ASSERT_TRUE (node.wallets.exists (transaction, key2.pub));
+	}
 }

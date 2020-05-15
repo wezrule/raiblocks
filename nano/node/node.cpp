@@ -1,5 +1,3 @@
-#define IGNORE_GTEST_INCL
-#include <nano/core_test/testutil.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/tomlconfig.hpp>
 #include <nano/lib/utility.hpp>
@@ -7,6 +5,7 @@
 #include <nano/node/daemonconfig.hpp>
 #include <nano/node/node.hpp>
 #include <nano/node/telemetry.hpp>
+#include <nano/node/testing.hpp>
 #include <nano/node/websocket.hpp>
 #include <nano/rpc/rpc.hpp>
 #include <nano/secure/buffer.hpp>
@@ -390,7 +389,7 @@ node_seq (seq)
 		{
 			std::ostringstream stream;
 			stream << "Voting is enabled, more system resources will be used";
-			auto voting (wallets.rep_counts ().voting);
+			auto voting (wallets.reps ().voting);
 			if (voting > 0)
 			{
 				stream << ". " << voting << " representative(s) are configured";

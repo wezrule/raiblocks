@@ -51,7 +51,7 @@ nano::active_transactions::~active_transactions ()
 void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction const & transaction_a)
 {
 	// Limit maximum count of elections to start
-	auto rep_counts (node.wallets.rep_counts ());
+	auto rep_counts (node.wallets.reps ());
 	bool representative (node.config.enable_voting && rep_counts.voting > 0);
 	bool half_princpal_representative (representative && rep_counts.half_principal > 0);
 	/* Check less frequently for regular nodes in auto mode */
@@ -94,7 +94,8 @@ void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction
 						if (info.block_count > confirmation_height_info.height)
 						{
 							auto block (this->node.store.block_get (transaction_a, info.head));
-							auto insert_result = this->insert (block);
+							auto previous_balance (this->node.ledger.balance (transaction_a, block->previous ()));
+							auto insert_result = this->insert (block, previous_balance);
 							if (insert_result.inserted)
 							{
 								insert_result.election->transition_active ();
@@ -511,9 +512,16 @@ nano::election_insertion_result nano::active_transactions::insert_impl (std::sha
 				result.inserted = true;
 				auto hash (block_a->hash ());
 				auto epoch (block_a->sideband ().details.epoch);
-				auto previous_balance = block_a->previous ().is_zero () ? 0 : previous_balance_a.value_or_eval ([& node = node, &block_a] {
-					return node.ledger.balance (node.store.tx_begin_read (), block_a->previous ());
-				});
+				nano::uint128_t previous_balance (previous_balance_a.value_or (0));
+				debug_assert (!(previous_balance_a.value_or (0) > 0 && block_a->previous ().is_zero ()));
+				if (!previous_balance_a.is_initialized () && !block_a->previous ().is_zero ())
+				{
+					auto transaction (node.store.tx_begin_read ());
+					if (node.ledger.block_exists (block_a->previous ()))
+					{
+						previous_balance = node.ledger.balance (transaction, block_a->previous ());
+					}
+				}
 				double multiplier (normalized_multiplier (*block_a));
 				bool prioritized = roots.size () < prioritized_cutoff || multiplier > last_prioritized_multiplier.value_or (0);
 				result.election = nano::make_shared<nano::election> (node, block_a, confirmation_action_a, prioritized);
@@ -597,9 +605,13 @@ nano::vote_code nano::active_transactions::vote (std::shared_ptr<nano::vote> vot
 	if (at_least_one)
 	{
 		// Republish vote if it is new and the node does not host a principal representative (or close to)
-		if (processed && !node.wallets.rep_counts ().have_half_rep ())
+		if (processed)
 		{
-			node.network.flood_vote (vote_a, 0.5f);
+			auto const reps (node.wallets.reps ());
+			if (!reps.have_half_rep () && !reps.exists (vote_a->account))
+			{
+				node.network.flood_vote (vote_a, 0.5f);
+			}
 		}
 		return replay ? nano::vote_code::replay : nano::vote_code::vote;
 	}
