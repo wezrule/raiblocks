@@ -75,11 +75,19 @@ bool nano::state_block_signature_verification::is_active ()
 
 void nano::state_block_signature_verification::add (nano::unchecked_info const & info_a)
 {
+	bool added{ false };
 	{
 		nano::lock_guard<std::mutex> guard (mutex);
-		state_blocks.push_back (info_a);
+		if (state_blocks.get<unchecked_info_tag_hash> ().find (info_a.hash ()) == state_blocks.get<unchecked_info_tag_hash> ().cend ())
+		{
+			state_blocks.push_back (info_a);
+			added = true;
+		}
 	}
-	condition.notify_one ();
+	if (added)
+	{
+		condition.notify_one ();
+	}
 }
 
 size_t nano::state_block_signature_verification::size ()
@@ -88,9 +96,9 @@ size_t nano::state_block_signature_verification::size ()
 	return state_blocks.size ();
 }
 
-std::deque<nano::unchecked_info> nano::state_block_signature_verification::setup_items (size_t max_count)
+nano::unchecked_info_mic nano::state_block_signature_verification::setup_items (size_t max_count)
 {
-	std::deque<nano::unchecked_info> items;
+	unchecked_info_mic items;
 	if (state_blocks.size () <= max_count)
 	{
 		items.swap (state_blocks);
@@ -107,7 +115,7 @@ std::deque<nano::unchecked_info> nano::state_block_signature_verification::setup
 	return items;
 }
 
-void nano::state_block_signature_verification::verify_state_blocks (std::deque<nano::unchecked_info> & items)
+void nano::state_block_signature_verification::verify_state_blocks (unchecked_info_mic & items)
 {
 	if (!items.empty ())
 	{

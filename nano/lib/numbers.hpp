@@ -294,6 +294,14 @@ struct hash<::nano::block_hash>
 	}
 };
 template <>
+struct equal_to<std::reference_wrapper<::nano::block_hash const>>
+{
+	bool operator() (std::reference_wrapper<::nano::block_hash const> const & lhs, std::reference_wrapper<::nano::block_hash const> const & rhs) const
+	{
+		return lhs.get () == rhs.get ();
+	}
+};
+template <>
 struct hash<::nano::private_key>
 {
 	size_t operator() (::nano::private_key const & data_a) const

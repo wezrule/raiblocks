@@ -10,11 +10,17 @@
 #include <nano/lib/utility.hpp>
 
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/mem_fun.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index_container.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/property_tree/ptree_fwd.hpp>
 #include <boost/variant/variant.hpp>
 
 #include <unordered_map>
+
+namespace mi = boost::multi_index;
 
 namespace boost
 {
@@ -33,6 +39,15 @@ struct hash<::nano::block_hash>
 	size_t operator() (::nano::block_hash const & value_a) const
 	{
 		return std::hash<::nano::block_hash> () (value_a);
+	}
+};
+
+template <>
+struct hash<std::reference_wrapper<::nano::block_hash const>>
+{
+	size_t operator() (std::reference_wrapper<::nano::block_hash const> const & value_a) const
+	{
+		return std::hash<::nano::block_hash> () (value_a.get ());
 	}
 };
 
@@ -192,6 +207,7 @@ public:
 	unchecked_info (std::shared_ptr<nano::block>, nano::account const &, uint64_t, nano::signature_verification = nano::signature_verification::unknown, bool = false);
 	void serialize (nano::stream &) const;
 	bool deserialize (nano::stream &);
+	std::reference_wrapper<nano::block_hash const> hash () const;
 	std::shared_ptr<nano::block> block;
 	nano::account account{ 0 };
 	/** Seconds since posix epoch */
@@ -199,6 +215,16 @@ public:
 	nano::signature_verification verified{ nano::signature_verification::unknown };
 	bool confirmed{ false };
 };
+
+// clang-format off
+class unchecked_info_tag_sequence {};
+class unchecked_info_tag_hash {};
+using unchecked_info_mic = boost::multi_index_container<nano::unchecked_info,
+mi::indexed_by<
+	mi::sequenced<mi::tag<unchecked_info_tag_sequence>>,
+	mi::hashed_unique<mi::tag<unchecked_info_tag_hash>,
+		mi::const_mem_fun<nano::unchecked_info, std::reference_wrapper<nano::block_hash const>, &nano::unchecked_info::hash>>>>;
+// clang-format on
 
 class block_info final
 {

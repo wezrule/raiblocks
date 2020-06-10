@@ -3,7 +3,6 @@
 #include <nano/lib/locks.hpp>
 #include <nano/secure/common.hpp>
 
-#include <deque>
 #include <functional>
 #include <thread>
 
@@ -24,7 +23,7 @@ public:
 	void stop ();
 	bool is_active ();
 
-	std::function<void(std::deque<nano::unchecked_info> &, std::vector<int> const &, std::vector<nano::block_hash> const &, std::vector<nano::signature> const &)> blocks_verified_callback;
+	std::function<void(unchecked_info_mic &, std::vector<int> const &, std::vector<nano::block_hash> const &, std::vector<nano::signature> const &)> blocks_verified_callback;
 	std::function<void()> transition_inactive_callback;
 
 private:
@@ -36,13 +35,14 @@ private:
 	std::mutex mutex;
 	bool stopped{ false };
 	bool active{ false };
-	std::deque<nano::unchecked_info> state_blocks;
+
+	unchecked_info_mic state_blocks;
 	nano::condition_variable condition;
 	std::thread thread;
 
 	void run (uint64_t block_processor_verification_size);
-	std::deque<nano::unchecked_info> setup_items (size_t);
-	void verify_state_blocks (std::deque<nano::unchecked_info> &);
+	unchecked_info_mic setup_items (size_t);
+	void verify_state_blocks (unchecked_info_mic &);
 };
 
 std::unique_ptr<nano::container_info_component> collect_container_info (state_block_signature_verification & state_block_signature_verification, const std::string & name);

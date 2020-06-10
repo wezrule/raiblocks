@@ -24,7 +24,7 @@ node (node_a),
 write_database_queue (write_database_queue_a),
 state_block_signature_verification (node.checker, node.ledger.network_params.ledger.epochs, node.config, node.logger, node.flags.block_processor_verification_size)
 {
-	state_block_signature_verification.blocks_verified_callback = [this](std::deque<nano::unchecked_info> & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures) {
+	state_block_signature_verification.blocks_verified_callback = [this](nano::unchecked_info_mic & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures) {
 		this->process_verified_state_blocks (items, verifications, hashes, blocks_signatures);
 	};
 	state_block_signature_verification.transition_inactive_callback = [this]() {
@@ -88,31 +88,48 @@ void nano::block_processor::add (std::shared_ptr<nano::block> block_a, uint64_t 
 	add (info);
 }
 
+bool nano::block_processor::contains (nano::unchecked_info const & info_a) const
+{
+	return blocks.get<unchecked_info_tag_hash> ().find (info_a.hash ()) != blocks.get<unchecked_info_tag_hash> ().cend ();
+}
+
 void nano::block_processor::add (nano::unchecked_info const & info_a, const bool push_front_preference_a)
 {
 	debug_assert (!nano::work_validate_entry (*info_a.block));
 	bool quarter_full (size () > node.flags.block_processor_full_size / 4);
+	auto added{ false };
 	if (info_a.verified == nano::signature_verification::unknown && (info_a.block->type () == nano::block_type::state || info_a.block->type () == nano::block_type::open || !info_a.account.is_zero ()))
 	{
-		state_block_signature_verification.add (info_a);
+		// Do a preliminary check to see if the block is already in the process queue, to save signature checking
+		nano::lock_guard<std::mutex> guard (mutex);
+		if (!contains (info_a))
+		{
+			state_block_signature_verification.add (info_a);
+		}
 	}
 	else if (push_front_preference_a && !quarter_full)
 	{
-		/* Push blocks from unchecked to front of processing deque to keep more operations with unchecked inside of single write transaction.
+		/* Push blocks from unchecked to front of processing queue to keep more operations with unchecked inside of single write transaction.
 		It's designed to help with realtime blocks traffic if block processor is not performing large task like bootstrap.
-		If deque is a quarter full then push back to allow other blocks processing. */
+		If queue is a quarter full then push back to allow other blocks processing. */
+		nano::lock_guard<std::mutex> guard (mutex);
+		if (!contains (info_a))
 		{
-			nano::lock_guard<std::mutex> guard (mutex);
 			blocks.push_front (info_a);
+			added = true;
 		}
-		condition.notify_all ();
 	}
 	else
 	{
+		nano::lock_guard<std::mutex> guard (mutex);
+		if (!contains (info_a))
 		{
-			nano::lock_guard<std::mutex> guard (mutex);
 			blocks.push_back (info_a);
+			added = true;
 		}
+	}
+	if (added)
+	{
 		condition.notify_all ();
 	}
 }
@@ -171,38 +188,53 @@ bool nano::block_processor::have_blocks ()
 	return !blocks.empty () || !forced.empty () || state_block_signature_verification.size () != 0;
 }
 
-void nano::block_processor::process_verified_state_blocks (std::deque<nano::unchecked_info> & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures)
+void nano::block_processor::process_verified_state_blocks (nano::unchecked_info_mic & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures)
 {
 	{
 		nano::unique_lock<std::mutex> lk (mutex);
 		for (auto i (0); i < verifications.size (); ++i)
 		{
 			debug_assert (verifications[i] == 1 || verifications[i] == 0);
-			auto & item (items.front ());
-			if (!item.block->link ().is_zero () && node.ledger.is_epoch_link (item.block->link ()))
+			auto & item (items.begin ());
+			if (!item->block->link ().is_zero () && node.ledger.is_epoch_link (item->block->link ()))
 			{
 				// Epoch blocks
 				if (verifications[i] == 1)
 				{
-					item.verified = nano::signature_verification::valid_epoch;
-					blocks.push_back (std::move (item));
+					if (!contains (*item))
+					{
+						items.modify (item, [](auto & item_a) {
+							item_a.verified = nano::signature_verification::valid_epoch;
+						});
+						blocks.push_back (std::move (*item));
+					}
 				}
 				else
 				{
 					// Possible regular state blocks with epoch link (send subtype)
-					item.verified = nano::signature_verification::unknown;
-					blocks.push_back (std::move (item));
+					if (!contains (*item))
+					{
+						items.modify (item, [](auto & item_a) {
+							item_a.verified = nano::signature_verification::unknown;
+						});
+						blocks.push_back (std::move (*item));
+					}
 				}
 			}
 			else if (verifications[i] == 1)
 			{
 				// Non epoch blocks
-				item.verified = nano::signature_verification::valid;
-				blocks.push_back (std::move (item));
+				if (!contains (*item))
+				{
+					items.modify (item, [](auto & item_a) {
+						item_a.verified = nano::signature_verification::valid;
+					});
+					blocks.push_back (std::move (*item));
+				}
 			}
 			else
 			{
-				requeue_invalid (hashes[i], item);
+				requeue_invalid (hashes[i], *item);
 			}
 			items.pop_front ();
 		}

@@ -4,12 +4,6 @@
 #include <nano/node/state_block_signature_verification.hpp>
 #include <nano/secure/common.hpp>
 
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/sequenced_index.hpp>
-#include <boost/multi_index_container.hpp>
-
 #include <chrono>
 #include <memory>
 #include <unordered_set>
@@ -67,12 +61,13 @@ private:
 	void process_live (nano::block_hash const &, std::shared_ptr<nano::block>, nano::process_return const &, const bool = false, nano::block_origin const = nano::block_origin::remote);
 	void process_old (nano::write_transaction const &, std::shared_ptr<nano::block> const &, nano::block_origin const);
 	void requeue_invalid (nano::block_hash const &, nano::unchecked_info const &);
-	void process_verified_state_blocks (std::deque<nano::unchecked_info> &, std::vector<int> const &, std::vector<nano::block_hash> const &, std::vector<nano::signature> const &);
+	void process_verified_state_blocks (nano::unchecked_info_mic &, std::vector<int> const &, std::vector<nano::block_hash> const &, std::vector<nano::signature> const &);
+	bool contains (nano::unchecked_info const & info_a) const;
 	bool stopped{ false };
 	bool active{ false };
 	bool awaiting_write{ false };
 	std::chrono::steady_clock::time_point next_log;
-	std::deque<nano::unchecked_info> blocks;
+	nano::unchecked_info_mic blocks;
 	std::deque<std::shared_ptr<nano::block>> forced;
 	nano::condition_variable condition;
 	nano::node & node;
