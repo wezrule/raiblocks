@@ -122,11 +122,7 @@ void nano::block_processor::add (nano::unchecked_info const & info_a, const bool
 	else
 	{
 		nano::lock_guard<std::mutex> guard (mutex);
-		if (!contains (info_a))
-		{
-			blocks.push_back (info_a);
-			added = true;
-		}
+		added = blocks.get<unchecked_info_tag_hash> ().emplace (info_a).second;
 	}
 	if (added)
 	{
@@ -201,36 +197,29 @@ void nano::block_processor::process_verified_state_blocks (nano::unchecked_info_
 				// Epoch blocks
 				if (verifications[i] == 1)
 				{
-					if (!contains (*item))
-					{
-						items.modify (item, [](auto & item_a) {
-							item_a.verified = nano::signature_verification::valid_epoch;
-						});
-						blocks.push_back (std::move (*item));
-					}
+					items.modify (item, [](auto & item_a) {
+						item_a.verified = nano::signature_verification::valid_epoch;
+					});
+
+					blocks.get<unchecked_info_tag_hash> ().emplace (std::move (*item));
 				}
 				else
 				{
 					// Possible regular state blocks with epoch link (send subtype)
-					if (!contains (*item))
-					{
-						items.modify (item, [](auto & item_a) {
-							item_a.verified = nano::signature_verification::unknown;
-						});
-						blocks.push_back (std::move (*item));
-					}
+					items.modify (item, [](auto & item_a) {
+						item_a.verified = nano::signature_verification::unknown;
+					});
+					blocks.get<unchecked_info_tag_hash> ().emplace (std::move (*item));
 				}
 			}
 			else if (verifications[i] == 1)
 			{
 				// Non epoch blocks
-				if (!contains (*item))
-				{
-					items.modify (item, [](auto & item_a) {
-						item_a.verified = nano::signature_verification::valid;
-					});
-					blocks.push_back (std::move (*item));
-				}
+				items.modify (item, [](auto & item_a) {
+					item_a.verified = nano::signature_verification::valid;
+				});
+
+				blocks.get<unchecked_info_tag_hash> ().emplace (std::move (*item));
 			}
 			else
 			{

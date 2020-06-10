@@ -78,11 +78,7 @@ void nano::state_block_signature_verification::add (nano::unchecked_info const &
 	bool added{ false };
 	{
 		nano::lock_guard<std::mutex> guard (mutex);
-		if (state_blocks.get<unchecked_info_tag_hash> ().find (info_a.hash ()) == state_blocks.get<unchecked_info_tag_hash> ().cend ())
-		{
-			state_blocks.push_back (info_a);
-			added = true;
-		}
+		added = state_blocks.get<unchecked_info_tag_hash> ().insert (info_a).second;
 	}
 	if (added)
 	{
