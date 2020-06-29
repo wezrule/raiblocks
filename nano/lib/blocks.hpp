@@ -107,6 +107,7 @@ public:
 	virtual bool valid_predecessor (nano::block const &) const = 0;
 	static size_t size (nano::block_type);
 	virtual nano::work_version work_version () const;
+	virtual std::vector<uint8_t> const & data_payload () const;
 	uint64_t difficulty () const;
 	// If there are any changes to the hashables, call this to update the cached hash
 	void refresh ();
@@ -338,6 +339,7 @@ class state_block : public nano::block
 public:
 	state_block () = default;
 	state_block (nano::account const &, nano::block_hash const &, nano::account const &, nano::amount const &, nano::link const &, nano::raw_key const &, nano::public_key const &, uint64_t);
+	state_block (nano::account const &, nano::block_hash const &, nano::account const &, nano::amount const &, nano::link const &, nano::raw_key const &, nano::public_key const &, uint64_t, std::vector<uint8_t> const & data);
 	state_block (bool &, nano::stream &);
 	state_block (bool &, boost::property_tree::ptree const &);
 	virtual ~state_block () = default;
@@ -364,10 +366,13 @@ public:
 	bool operator== (nano::block const &) const override;
 	bool operator== (nano::state_block const &) const;
 	bool valid_predecessor (nano::block const &) const override;
+	std::vector<uint8_t> const & data_payload () const override;
 	nano::state_hashables hashables;
 	nano::signature signature;
 	uint64_t work;
+	std::vector<uint8_t> data; // (1024, 0); // This should be dynamic
 	static size_t constexpr size = nano::state_hashables::size + sizeof (signature) + sizeof (work);
+	static size_t constexpr size2 = nano::state_hashables::size + sizeof (signature) + sizeof (work) + 1024;
 };
 class block_visitor
 {

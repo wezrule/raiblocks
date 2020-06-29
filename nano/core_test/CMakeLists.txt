@@ -29,6 +29,7 @@ add_executable (core_test
 	peer_container.cpp
 	request_aggregator.cpp
 	signing.cpp
+	smart_contracts.cpp
 	socket.cpp
 	telemetry.cpp
 	toml.cpp

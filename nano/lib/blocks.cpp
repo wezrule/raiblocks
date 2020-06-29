@@ -189,6 +189,11 @@ nano::amount const & nano::block::balance () const
 	return amount;
 }
 
+std::vector<uint8_t> const & nano::block::data_payload () const
+{
+	throw std::runtime_error ("Not valid");
+}
+
 void nano::send_block::visit (nano::block_visitor & visitor_a) const
 {
 	visitor_a.send_block (*this);
@@ -1049,10 +1054,16 @@ void nano::state_hashables::hash (blake2b_state & hash_a) const
 	blake2b_update (&hash_a, link.bytes.data (), sizeof (link.bytes));
 }
 
-nano::state_block::state_block (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::link const & link_a, nano::raw_key const & prv_a, nano::public_key const & pub_a, uint64_t work_a) :
+nano::state_block::state_block (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::link const & link_a, nano::raw_key const & prv_a, nano::public_key const & pub_a, uint64_t work_a, std::vector<uint8_t> const & data_a) :
 hashables (account_a, previous_a, representative_a, balance_a, link_a),
 signature (nano::sign_message (prv_a, pub_a, hash ())),
-work (work_a)
+work (work_a),
+data (data_a)
+{
+}
+
+nano::state_block::state_block (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::link const & link_a, nano::raw_key const & prv_a, nano::public_key const & pub_a, uint64_t work_a) :
+	state_block (account_a, previous_a, representative_a, balance_a, link_a, prv_a, pub_a, work_a, {})
 {
 }
 
@@ -1296,6 +1307,11 @@ nano::signature const & nano::state_block::block_signature () const
 void nano::state_block::signature_set (nano::signature const & signature_a)
 {
 	signature = signature_a;
+}
+
+std::vector<uint8_t> const & nano::state_block::data_payload () const
+{
+	return data;
 }
 
 std::shared_ptr<nano::block> nano::deserialize_block_json (boost::property_tree::ptree const & tree_a, nano::block_uniquer * uniquer_a)

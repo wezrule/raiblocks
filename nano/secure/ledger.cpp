@@ -5,6 +5,7 @@
 #include <nano/secure/blockstore.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/secure/ledger.hpp>
+#include <nano/secure/vm.hpp>
 
 namespace
 {
@@ -340,6 +341,39 @@ void ledger_processor::state_block_impl (nano::state_block & block_a)
 					result.code = block_a.difficulty () >= nano::work_threshold (block_a.work_version (), block_details) ? nano::process_result::progress : nano::process_result::insufficient_work; // Does this block have sufficient work? (Malformed)
 					if (result.code == nano::process_result::progress)
 					{
+						/*
+						// Could this be contract creation call, contract function call or company id
+						if (!block_a.data.empty ())
+						{
+							// Currently just hardcoding it
+							auto is_contract_creation = block_a.data.size () > 50; // This is ok?
+
+							if (is_contract_creation)
+							{
+								// Add contract open block
+								auto contract_open_block = std::make_shared <nano::state_block> (block_a.link (), 0, block_a.link (), 100 * nano::Mxrb_ratio, hash, 0);
+								nano::block_details contract_block_details (nano::epoch::epoch_2, false, true, false); // all 3 means contract open
+								block_a.sideband_set (nano::block_sideband (block_a.link (), 0, 0, 1, nano::seconds_since_epoch (), contract_block_details));
+								ledger.store.block_put (transaction, hash, block_a);
+
+								// Add contract account
+								nano::account_info contract_key_account_info (hash, block_a.representative (), hash, block_a.hashables.balance, nano::seconds_since_epoch (), 1, epoch);
+								ledger.store.account_put (transaction, block_a.link (), contract_key_account_info);
+							}
+							else
+							{
+								// This is a contract call which causes a state change
+								// Find the contract
+								auto contract_block = ledger.store.block_get (transaction, info.open_block);
+								release_assert (contract_block);
+
+								auto contract_create_block_hash = contract_block->link ();
+								auto contract_create_block = ledger.store.block_get (transaction, contract_create_block_hash);
+								release_assert (contract_create_block);
+								nano::execute_nano_bytecode (contract_create_block->data_payload (), block_a.data_payload (), ledger);
+							}
+						}*/
+
 						ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::state_block);
 						block_a.sideband_set (nano::block_sideband (block_a.hashables.account /* unused */, 0, 0 /* unused */, info.block_count + 1, nano::seconds_since_epoch (), block_details));
 						ledger.store.block_put (transaction, hash, block_a);
