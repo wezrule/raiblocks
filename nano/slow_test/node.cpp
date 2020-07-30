@@ -5,6 +5,9 @@
 #include <nano/node/transport/udp.hpp>
 #include <nano/test_common/testutil.hpp>
 
+// TODO: Just for testing
+#include <nano/node/rocksdb/rocksdb.hpp>
+
 #include <gtest/gtest.h>
 
 #include <boost/format.hpp>
@@ -107,7 +110,7 @@ TEST (ledger, deep_account_compute)
 	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, open).code);
 	auto sprevious (send.hash ());
 	auto rprevious (open.hash ());
-	for (auto i (0), n (100000); i != n; ++i)
+	for (auto i (0), n (500000); i != n; ++i)
 	{
 		balance -= 1;
 		nano::send_block send (sprevious, key.pub, balance, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *pool.generate (sprevious));
@@ -116,9 +119,11 @@ TEST (ledger, deep_account_compute)
 		nano::receive_block receive (rprevious, send.hash (), key.prv, key.pub, *pool.generate (rprevious));
 		ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, receive).code);
 		rprevious = receive.hash ();
-		if (i % 100 == 0)
+		if (i % 1000 == 0)
 		{
-			std::cerr << i << ' ';
+			transaction.commit ();
+			transaction.renew ();
+			//std::cerr << i << ' ';
 		}
 		ledger.account (transaction, sprevious);
 		ledger.balance (transaction, rprevious);
@@ -389,17 +394,174 @@ TEST (peer_container, random_set)
 // Can take up to 2 hours
 TEST (store, unchecked_load)
 {
-	nano::system system (1);
-	auto & node (*system.nodes[0]);
-	auto block (std::make_shared<nano::send_block> (0, 0, 0, nano::test_genesis_key.prv, nano::test_genesis_key.pub, 0));
-	constexpr auto num_unchecked = 1000000;
-	for (auto i (0); i < 1000000; ++i)
+	auto path = nano::unique_path ();
+	constexpr auto num_unchecked = 2000000; // 5000000; //30000000;
+
 	{
-		auto transaction (node.store.tx_begin_write ());
-		node.store.unchecked_put (transaction, i, block);
+		nano::logger_mt logger;
+		// Update defaults
+		nano::rocksdb_config rocksdb_config;
+
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto block (std::make_shared<nano::send_block> (0, 0, 0, nano::test_genesis_key.prv, nano::test_genesis_key.pub, 0));
+		/*
+		{
+			auto transaction (store->tx_begin_write ());
+			nano::ledger_cache ledger_cache;
+			nano::genesis gensis;
+			store->initialize (transaction, gensis, ledger_cache);
+			nano::work_pool pool (std::numeric_limits<unsigned>::max ());
+			nano::send_block send (nano::genesis_hash, nano::test_genesis_key.pub, nano::genesis_amount, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *pool.generate (nano::genesis_hash));
+			send.sideband_set ({});
+			store->block_put (transaction, send.hash (), send, nano::store_hint::key_not_exists);
+			store->block_del (transaction, send.hash ());
+			store->block_put (transaction, send.hash (), send, nano::store_hint::key_not_exists);
+			store->block_del (transaction, send.hash ());
+			store->block_put (transaction, send.hash (), send, nano::store_hint::key_not_exists);
+			nano::send_block send1 (nano::genesis_hash, nano::test_genesis_key.pub, nano::genesis_amount, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *pool.generate (nano::genesis_hash));
+			send1.sideband_set ({});
+			store->block_put (transaction, send1.hash (), send1, nano::store_hint::key_not_exists);
+		}*/
+
+		std::vector<int> keys(num_unchecked);
+		std::iota (keys.begin(), keys.end (), 0);
+		std::random_device rd;
+		std::mt19937 g(rd());
+		std::shuffle (keys.begin (), keys.end (), g);
+
+//		std::unordered_set<int> keys_to_delete(num_unchecked);
+//		std::iota (keys_to_delete.begin(), keys_to_delete.end (), 0);
+//		std::shuffle (keys_to_delete.begin (), keys_to_delete.end (), g);
+
+		//keys_to_delete.erase (keys_to_delete.begin (), keys_to_delete.begin () + keys_to_delete.size () / 2);
+
+//		keys_to_delete.resize (keys_to_delete.size () / 2);
+
+		auto del = false;
+
+		for (auto i = 0; i < num_unchecked; ++i)
+		{
+			auto key = keys[i];
+			auto transaction (store->tx_begin_write ());
+			store->unchecked_put (transaction, key, block);
+
+			// Delete every other one
+			if (del)
+				store->unchecked_del (transaction, { key, block->hash () });
+//			else
+
+			store->unchecked_get (transaction, key);
+
+			del ^= true;
+		}
+
+		{
+//			auto transaction (store->tx_begin_read ());
+//			ASSERT_EQ (num_unchecked, store->unchecked_count (transaction));		
+		}
+
+	//	for (auto key : keys_to_delete)
+	//	{
+	//		auto transaction (store->tx_begin_write ());
+	//		store->unchecked_del (transaction, { key, block->hash () });
+	//	}
+
+	//	for (auto i = 0; i < num_unchecked; ++i)
+	//	{
+	//		auto transaction (store->tx_begin_read ());
+	//		store->unchecked_get (transaction, i);
+	//	}
+		//{
+	//	auto transaction (store->tx_begin_read ());
+	//	ASSERT_EQ (num_unchecked, store->unchecked_count (transaction));
+		//ASSERT_EQ (3, store->block_count (transaction));
+		//}
+
+		// Delete half
+	//	for (auto i (0); i < num_unchecked; i += 2)
+	//	{
+	//		auto transaction (store->tx_begin_write ());
+	//		store->unchecked_del (transaction, { nano::block_hash (i), block->hash () });
+
+			// Do gets  
+
+		//}
+
+	//	auto sum = 0;
+	//	auto transaction (store->tx_begin_read ());
+		// I want point lookups!
+	//	for (auto i (0); i < num_unchecked; ++i)
+	//	{
+	//		auto transaction (store->tx_begin_write ());
+	//		store->unchecked_get (transaction, i);
+	//	}
+
+
+	//	for (auto i (store->unchecked_begin (transaction)); i != store->unchecked_end (); ++i)
+	//	{
+	//		sum++;
+	//	}
+
+		//ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
 	}
-	auto transaction (node.store.tx_begin_read ());
-	ASSERT_EQ (num_unchecked, node.store.unchecked_count (transaction));
+	/*
+	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto transaction (store->tx_begin_read ());
+
+		for (auto i (0); i < num_unchecked; ++i)
+		{
+			auto transaction (store->tx_begin_read ());
+			store->unchecked_get (transaction, i);
+		}
+
+//		auto sum = 0;
+//		for (auto i (store->unchecked_begin (transaction)); i != store->unchecked_end (); ++i)
+//		{
+//			sum++;
+//		}
+
+		//ASSERT_EQ (num_unchecked - 1, sum);
+
+		//ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
+		ASSERT_EQ (3, store->block_count (transaction));
+	}*/
+
+
+
+
+
+
+
+
+
+
+
+
+/*	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto transaction (store->tx_begin_read ());
+	//	ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
+
+		ASSERT_EQ (3, store->block_count (transaction));
+	}
+	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto transaction (store->tx_begin_read ());
+	//	ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
+
+		ASSERT_EQ (3, store->block_count (transaction));
+	}*/
 }
 
 TEST (store, vote_load)
@@ -439,7 +601,7 @@ TEST (node, mass_vote_by_hash)
 	nano::block_hash previous (nano::genesis_hash);
 	nano::keypair key;
 	std::vector<std::shared_ptr<nano::state_block>> blocks;
-	for (auto i (0); i < 10000; ++i)
+	for (auto i (0); i < 1000000; ++i)
 	{
 		auto block (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, previous, nano::test_genesis_key.pub, nano::genesis_amount - (i + 1) * nano::Gxrb_ratio, key.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.work.generate (previous)));
 		previous = block->hash ();
@@ -914,20 +1076,25 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 {
 	nano::logger_mt logger;
 	auto path (nano::unique_path ());
-	nano::mdb_store store (logger, path);
-	ASSERT_TRUE (!store.init_error ());
+	auto store = nano::make_store (logger, path);
 	nano::genesis genesis;
 	nano::stat stats;
-	nano::ledger ledger (store, stats);
+	nano::ledger ledger (*store, stats);
 	nano::write_database_queue write_database_queue;
 	nano::work_pool pool (std::numeric_limits<unsigned>::max ());
 	std::atomic<bool> stopped{ false };
 	boost::latch initialized_latch{ 0 };
 
+	{
+		auto transaction (store->tx_begin_write ());
+		store->initialize (transaction, genesis, ledger.cache);
+		ASSERT_TRUE (!store->init_error ());
+	}
+
 	nano::block_hash block_hash_being_processed{ 0 };
 	nano::confirmation_height_processor confirmation_height_processor{ ledger, write_database_queue, 10ms, logger, initialized_latch, confirmation_height_mode::automatic };
 
-	auto const num_accounts = 100000;
+	auto const num_accounts = 1000000;
 
 	auto latest_genesis = nano::genesis_hash;
 	std::vector<nano::keypair> keys;
@@ -936,9 +1103,7 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 	nano::system system;
 
 	{
-		auto transaction (store.tx_begin_write ());
-		store.initialize (transaction, genesis, ledger.cache);
-
+		auto transaction (store->tx_begin_write ());
 		// Send from genesis account to all other accounts and create open block for them
 		for (auto i = 0; i < num_accounts; ++i)
 		{
@@ -953,24 +1118,12 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 		}
 	}
 
-	for (auto & open_block : open_blocks)
-	{
-		confirmation_height_processor.add (open_block->hash ());
-	}
-
-	system.deadline_set (1000s);
-	auto num_blocks_to_confirm = num_accounts * 2;
-	while (stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in) != num_blocks_to_confirm)
-	{
-		ASSERT_NO_ERROR (system.poll ());
-	}
-
 	std::vector<std::shared_ptr<nano::send_block>> send_blocks;
 	std::vector<std::shared_ptr<nano::receive_block>> receive_blocks;
 
 	// Now add all send/receive blocks
 	{
-		auto transaction (store.tx_begin_write ());
+		auto transaction (store->tx_begin_write ());
 		for (int i = 0; i < open_blocks.size (); ++i)
 		{
 			auto open_block = open_blocks[i];
@@ -981,6 +1134,11 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 			ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, *send_blocks.back ()).code);
 			ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, *receive_blocks.back ()).code);
 		}
+	}
+
+	for (auto & open_block : open_blocks)
+	{
+		confirmation_height_processor.add (open_block->hash ());
 	}
 
 	// Randomize the order that send and receive blocks are added to the confirmation height processor
@@ -997,8 +1155,8 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 		confirmation_height_processor.add (receive_blocks[i]->hash ());
 	}
 
-	system.deadline_set (1000s);
-	num_blocks_to_confirm = num_accounts * 4;
+	system.deadline_set (5000s);
+	auto num_blocks_to_confirm = num_accounts * 4;
 	while (stats.count (nano::stat::type::confirmation_height, nano::stat::detail::blocks_confirmed, nano::stat::dir::in) != num_blocks_to_confirm)
 	{
 		ASSERT_NO_ERROR (system.poll ());
@@ -1009,7 +1167,7 @@ TEST (confirmation_height, many_accounts_send_receive_self_no_elections)
 		ASSERT_NO_ERROR (system.poll ());
 	}
 
-	auto transaction = store.tx_begin_read ();
+	auto transaction = store->tx_begin_read ();
 	auto cemented_count = 0;
 	for (auto i (ledger.store.confirmation_height_begin (transaction)), n (ledger.store.confirmation_height_end ()); i != n; ++i)
 	{

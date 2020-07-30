@@ -31,50 +31,31 @@ template <typename T, typename U>
 class rocksdb_iterator : public store_iterator_impl<T, U>
 {
 public:
-	rocksdb_iterator (rocksdb::DB * db, nano::transaction const & transaction_a, rocksdb::ColumnFamilyHandle * handle_a)
+	rocksdb_iterator () = default;
+
+	rocksdb_iterator (rocksdb::DB * db, nano::transaction const & transaction_a, rocksdb::ColumnFamilyHandle * handle_a, rocksdb_val const * val_a)
 	{
 		rocksdb::Iterator * iter;
 		if (is_read (transaction_a))
 		{
-			iter = db->NewIterator (snapshot_options (transaction_a), handle_a);
+			// TODO: Do I need fill_cache set to false here, or should that be set where iterator is called?
+			cursor.reset (db->NewIterator (snapshot_options (transaction_a), handle_a));
 		}
 		else
 		{
 			rocksdb::ReadOptions ropts;
 			ropts.fill_cache = false;
-			iter = tx (transaction_a)->GetIterator (ropts, handle_a);
+			cursor.reset (tx (transaction_a)->GetIterator (ropts, handle_a));
 		}
 
-		cursor.reset (iter);
+		if (val_a)
+		{
+			cursor->Seek (*val_a);
+		}
+		else
+		{
 		cursor->SeekToFirst ();
-
-		if (cursor->Valid ())
-		{
-			current.first.value = cursor->key ();
-			current.second.value = cursor->value ();
 		}
-		else
-		{
-			clear ();
-		}
-	}
-
-	rocksdb_iterator () = default;
-
-	rocksdb_iterator (rocksdb::DB * db, nano::transaction const & transaction_a, rocksdb::ColumnFamilyHandle * handle_a, rocksdb_val const & val_a)
-	{
-		rocksdb::Iterator * iter;
-		if (is_read (transaction_a))
-		{
-			iter = db->NewIterator (snapshot_options (transaction_a), handle_a);
-		}
-		else
-		{
-			iter = tx (transaction_a)->GetIterator (rocksdb::ReadOptions (), handle_a);
-		}
-
-		cursor.reset (iter);
-		cursor->Seek (val_a);
 
 		if (cursor->Valid ())
 		{
@@ -85,6 +66,11 @@ public:
 		{
 			clear ();
 		}
+	}
+
+	rocksdb_iterator (rocksdb::DB * db, nano::transaction const & transaction_a, rocksdb::ColumnFamilyHandle * handle_a)
+		: rocksdb_iterator (db, transaction_a, handle_a, nullptr)
+	{
 	}
 
 	rocksdb_iterator (nano::rocksdb_iterator<T, U> && other_a)

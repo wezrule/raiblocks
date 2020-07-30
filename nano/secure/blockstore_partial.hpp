@@ -32,7 +32,7 @@ public:
 		auto hash_l (genesis_a.hash ());
 		debug_assert (latest_begin (transaction_a) == latest_end ());
 		genesis_a.open->sideband_set (nano::block_sideband (network_params.ledger.genesis_account, 0, network_params.ledger.genesis_amount, 1, nano::seconds_since_epoch (), nano::epoch::epoch_0, false, false, false));
-		block_put (transaction_a, hash_l, *genesis_a.open);
+		block_put (transaction_a, hash_l, *genesis_a.open, store_hint::key_not_exists);
 		++ledger_cache_a.block_count;
 		confirmation_height_put (transaction_a, network_params.ledger.genesis_account, nano::confirmation_height_info{ 1, genesis_a.hash () });
 		++ledger_cache_a.cemented_count;
@@ -92,18 +92,7 @@ public:
 		return (success (status));
 	}
 
-	std::vector<nano::unchecked_info> unchecked_get (nano::transaction const & transaction_a, nano::block_hash const & hash_a) override
-	{
-		std::vector<nano::unchecked_info> result;
-		for (auto i (unchecked_begin (transaction_a, nano::unchecked_key (hash_a, 0))), n (unchecked_end ()); i != n && i->first.key () == hash_a; ++i)
-		{
-			nano::unchecked_info const & unchecked_info (i->second);
-			result.push_back (unchecked_info);
-		}
-		return result;
-	}
-
-	void block_put (nano::write_transaction const & transaction_a, nano::block_hash const & hash_a, nano::block const & block_a) override
+	void block_put (nano::write_transaction const & transaction_a, nano::block_hash const & hash_a, nano::block const & block_a, nano::store_hint store_hint_a) override
 	{
 		debug_assert (block_a.sideband ().successor.is_zero () || block_exists (transaction_a, block_a.sideband ().successor));
 		std::vector<uint8_t> vector;
@@ -112,7 +101,7 @@ public:
 			nano::serialize_block (stream, block_a);
 			block_a.sideband ().serialize (stream, block_a.type ());
 		}
-		block_raw_put (transaction_a, vector, hash_a);
+		block_raw_put (transaction_a, vector, hash_a, store_hint_a);
 		nano::block_predecessor_set<Val, Derived_Store> predecessor (transaction_a, *this);
 		block_a.visit (predecessor);
 		debug_assert (block_a.previous ().is_zero () || block_successor (transaction_a, block_a.previous ()) == hash_a);
@@ -240,7 +229,7 @@ public:
 		auto type = block_type_from_raw (value.data ());
 		std::vector<uint8_t> data (static_cast<uint8_t *> (value.data ()), static_cast<uint8_t *> (value.data ()) + value.size ());
 		std::fill_n (data.begin () + block_successor_offset (transaction_a, value.size (), type), sizeof (nano::block_hash), uint8_t{ 0 });
-		block_raw_put (transaction_a, data, hash_a);
+		block_raw_put (transaction_a, data, hash_a, store_hint::key_exists);
 	}
 
 	void unchecked_put (nano::write_transaction const & transaction_a, nano::block_hash const & hash_a, std::shared_ptr<nano::block> const & block_a) override
@@ -360,7 +349,7 @@ public:
 		nano::db_val<Val> data;
 		auto status = get (transaction_a, tables::meta, nano::db_val<Val> (version_key), data);
 		int result (minimum_version);
-		if (!not_found (status))
+		if (success (status))
 		{
 			nano::uint256_union version_value (data);
 			debug_assert (version_value.qwords[2] == 0 && version_value.qwords[1] == 0 && version_value.qwords[0] == 0);
@@ -381,17 +370,17 @@ public:
 		return nano::epoch::epoch_0;
 	}
 
-	void block_raw_put (nano::write_transaction const & transaction_a, std::vector<uint8_t> const & data, nano::block_hash const & hash_a)
+	void block_raw_put (nano::write_transaction const & transaction_a, std::vector<uint8_t> const & data, nano::block_hash const & hash_a, store_hint store_hint_a)
 	{
 		nano::db_val<Val> value{ data.size (), (void *)data.data () };
-		auto status = put (transaction_a, tables::blocks, hash_a, value);
+		auto status = put (transaction_a, tables::blocks, hash_a, value, store_hint_a);
 		release_assert (success (status));
 	}
 
 	void pending_put (nano::write_transaction const & transaction_a, nano::pending_key const & key_a, nano::pending_info const & pending_info_a) override
 	{
 		nano::db_val<Val> pending (pending_info_a);
-		auto status = put (transaction_a, tables::pending, key_a, pending);
+		auto status = put (transaction_a, tables::pending, key_a, pending, store_hint::none);
 		release_assert (success (status));
 	}
 
@@ -419,7 +408,7 @@ public:
 	void frontier_put (nano::write_transaction const & transaction_a, nano::block_hash const & block_a, nano::account const & account_a) override
 	{
 		nano::db_val<Val> account (account_a);
-		auto status (put (transaction_a, tables::frontiers, block_a, account));
+		auto status (put (transaction_a, tables::frontiers, block_a, account, store_hint::none));
 		release_assert (success (status));
 	}
 
@@ -445,7 +434,7 @@ public:
 	void unchecked_put (nano::write_transaction const & transaction_a, nano::unchecked_key const & key_a, nano::unchecked_info const & info_a) override
 	{
 		nano::db_val<Val> info (info_a);
-		auto status (put (transaction_a, tables::unchecked, key_a, info));
+		auto status (put (transaction_a, tables::unchecked, key_a, info, store_hint::none));
 		release_assert (success (status));
 	}
 
@@ -469,7 +458,7 @@ public:
 		return nullptr;
 	}
 
-	void flush (nano::write_transaction const & transaction_a) override
+	void write_cached_votes (nano::write_transaction const & transaction_a) override
 	{
 		{
 			nano::lock_guard<std::mutex> lock (cache_mutex);
@@ -484,7 +473,7 @@ public:
 				i->second->serialize (stream);
 			}
 			nano::db_val<Val> value (vector.size (), vector.data ());
-			auto status1 (put (transaction_a, tables::vote, i->first, value));
+			auto status1 (put (transaction_a, tables::vote, i->first, value, nano::store_hint::none));
 			release_assert (success (status1));
 		}
 	}
@@ -492,7 +481,7 @@ public:
 	void online_weight_put (nano::write_transaction const & transaction_a, uint64_t time_a, nano::amount const & amount_a) override
 	{
 		nano::db_val<Val> value (amount_a);
-		auto status (put (transaction_a, tables::online_weight, time_a, value));
+		auto status (put (transaction_a, tables::online_weight, time_a, value, store_hint::none));
 		release_assert (success (status));
 	}
 
@@ -507,7 +496,7 @@ public:
 		// Check we are still in sync with other tables
 		debug_assert (confirmation_height_exists (transaction_a, account_a));
 		nano::db_val<Val> info (info_a);
-		auto status = put (transaction_a, tables::accounts, account_a, info);
+		auto status = put (transaction_a, tables::accounts, account_a, info, store_hint::none);
 		release_assert (success (status));
 	}
 
@@ -552,7 +541,7 @@ public:
 	void peer_put (nano::write_transaction const & transaction_a, nano::endpoint_key const & endpoint_a) override
 	{
 		nano::db_val<Val> zero (static_cast<uint64_t> (0));
-		auto status = put (transaction_a, tables::peers, endpoint_a, zero);
+		auto status = put (transaction_a, tables::peers, endpoint_a, zero, store_hint::none);
 		release_assert (success (status));
 	}
 
@@ -615,7 +604,7 @@ public:
 	void confirmation_height_put (nano::write_transaction const & transaction_a, nano::account const & account_a, nano::confirmation_height_info const & confirmation_height_info_a) override
 	{
 		nano::db_val<Val> confirmation_height_info (confirmation_height_info_a);
-		auto status = put (transaction_a, tables::confirmation_height, account_a, confirmation_height_info);
+		auto status = put (transaction_a, tables::confirmation_height, account_a, confirmation_height_info, store_hint::none);
 		release_assert (success (status));
 	}
 
@@ -758,9 +747,9 @@ protected:
 		return static_cast<Derived_Store const &> (*this).get (transaction_a, table_a, key_a, value_a);
 	}
 
-	int put (nano::write_transaction const & transaction_a, tables table_a, nano::db_val<Val> const & key_a, nano::db_val<Val> const & value_a)
+	int put (nano::write_transaction const & transaction_a, tables table_a, nano::db_val<Val> const & key_a, nano::db_val<Val> const & value_a, nano::store_hint store_hint_a)
 	{
-		return static_cast<Derived_Store &> (*this).put (transaction_a, table_a, key_a, value_a);
+		return static_cast<Derived_Store &> (*this).put (transaction_a, table_a, key_a, value_a, store_hint_a);
 	}
 
 	int del (nano::write_transaction const & transaction_a, tables table_a, nano::db_val<Val> const & key_a)
@@ -796,7 +785,7 @@ public:
 		auto type = store.block_type_from_raw (value.data ());
 		std::vector<uint8_t> data (static_cast<uint8_t *> (value.data ()), static_cast<uint8_t *> (value.data ()) + value.size ());
 		std::copy (hash.bytes.begin (), hash.bytes.end (), data.begin () + store.block_successor_offset (transaction, value.size (), type));
-		store.block_raw_put (transaction, data, block_a.previous ());
+		store.block_raw_put (transaction, data, block_a.previous (), nano::store_hint::key_exists);
 	}
 	void send_block (nano::send_block const & block_a) override
 	{

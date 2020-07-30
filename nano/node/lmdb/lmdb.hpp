@@ -46,6 +46,10 @@ public:
 	void version_put (nano::write_transaction const &, int) override;
 
 	void serialize_mdb_tracker (boost::property_tree::ptree &, std::chrono::milliseconds, std::chrono::milliseconds) override;
+	void serialize_memory_stats (boost::property_tree::ptree &) override
+	{
+		// Do nothing
+	}
 
 	static void create_backup_file (nano::mdb_env &, boost::filesystem::path const &, nano::logger_mt &);
 
@@ -189,9 +193,10 @@ public:
 	MDB_dbi blocks{ 0 };
 
 	bool exists (nano::transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a) const;
+	std::vector<nano::unchecked_info> unchecked_get (nano::transaction const & transaction_a, nano::block_hash const & hash_a) override;
 
 	int get (nano::transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a, nano::mdb_val & value_a) const;
-	int put (nano::write_transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a, const nano::mdb_val & value_a) const;
+	int put (nano::write_transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a, const nano::mdb_val & value_a, nano::store_hint /* unused */) const;
 	int del (nano::write_transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a) const;
 
 	bool copy_db (boost::filesystem::path const & destination_file) override;

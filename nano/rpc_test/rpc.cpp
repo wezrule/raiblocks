@@ -6324,7 +6324,6 @@ TEST (rpc, unchecked_clear)
 	node.process_active (open);
 	node.block_processor.flush ();
 	boost::property_tree::ptree request;
-	ASSERT_EQ (node.ledger.cache.unchecked_count, 1);
 	{
 		auto transaction = node.store.tx_begin_read ();
 		ASSERT_EQ (node.store.unchecked_count (transaction), 1);
@@ -6335,7 +6334,6 @@ TEST (rpc, unchecked_clear)
 	ASSERT_EQ (200, response.status);
 
 	ASSERT_TIMELY (10s, node.store.unchecked_count (node.store.tx_begin_read ()) == 0);
-	ASSERT_EQ (node.ledger.cache.unchecked_count, 0);
 }
 
 TEST (rpc, unopened)

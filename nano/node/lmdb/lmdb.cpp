@@ -735,12 +735,23 @@ bool nano::mdb_store::exists (nano::transaction const & transaction_a, tables ta
 	return (status == MDB_SUCCESS);
 }
 
+std::vector<nano::unchecked_info> nano::mdb_store::unchecked_get (nano::transaction const & transaction_a, nano::block_hash const & hash_a)
+{
+	std::vector<nano::unchecked_info> result;
+	for (auto i (unchecked_begin (transaction_a, nano::unchecked_key (hash_a, 0))), n (unchecked_end ()); i != n && i->first.key () == hash_a; ++i)
+	{
+		nano::unchecked_info const & unchecked_info (i->second);
+		result.push_back (unchecked_info);
+	}
+	return result;
+}
+
 int nano::mdb_store::get (nano::transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a, nano::mdb_val & value_a) const
 {
 	return mdb_get (env.tx (transaction_a), table_to_dbi (table_a), key_a, value_a);
 }
 
-int nano::mdb_store::put (nano::write_transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a, const nano::mdb_val & value_a) const
+int nano::mdb_store::put (nano::write_transaction const & transaction_a, tables table_a, nano::mdb_val const & key_a, const nano::mdb_val & value_a, nano::store_hint /* unused */) const
 {
 	return (mdb_put (env.tx (transaction_a), table_to_dbi (table_a), key_a, value_a, 0));
 }

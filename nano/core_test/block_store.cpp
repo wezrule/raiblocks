@@ -121,7 +121,7 @@ TEST (block_store, add_item)
 	auto latest1 (store->block_get (transaction, hash1));
 	ASSERT_EQ (nullptr, latest1);
 	ASSERT_FALSE (store->block_exists (transaction, hash1));
-	store->block_put (transaction, hash1, block);
+	store->block_put (transaction, hash1, block, nano::store_hint::key_not_exists);
 	auto latest2 (store->block_get (transaction, hash1));
 	ASSERT_NE (nullptr, latest2);
 	ASSERT_EQ (block, *latest2);
@@ -140,17 +140,17 @@ TEST (block_store, clear_successor)
 	nano::open_block block1 (0, 1, 0, nano::keypair ().prv, 0, 0);
 	block1.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
-	store->block_put (transaction, block1.hash (), block1);
+	store->block_put (transaction, block1.hash (), block1, nano::store_hint::key_not_exists);
 	nano::open_block block2 (0, 2, 0, nano::keypair ().prv, 0, 0);
 	block2.sideband_set ({});
-	store->block_put (transaction, block2.hash (), block2);
+	store->block_put (transaction, block2.hash (), block2, nano::store_hint::key_not_exists);
 	auto block2_store (store->block_get (transaction, block1.hash ()));
 	ASSERT_NE (nullptr, block2_store);
 	ASSERT_EQ (0, block2_store->sideband ().successor.number ());
 	auto modified_sideband = block2_store->sideband ();
 	modified_sideband.successor = block2.hash ();
 	block1.sideband_set (modified_sideband);
-	store->block_put (transaction, block1.hash (), block1);
+	store->block_put (transaction, block1.hash (), block1, nano::store_hint::key_not_exists);
 	{
 		auto block1_store (store->block_get (transaction, block1.hash ()));
 		ASSERT_NE (nullptr, block1_store);
@@ -177,7 +177,7 @@ TEST (block_store, add_nonempty_block)
 	auto transaction (store->tx_begin_write ());
 	auto latest1 (store->block_get (transaction, hash1));
 	ASSERT_EQ (nullptr, latest1);
-	store->block_put (transaction, hash1, block);
+	store->block_put (transaction, hash1, block, nano::store_hint::key_not_exists);
 	auto latest2 (store->block_get (transaction, hash1));
 	ASSERT_NE (nullptr, latest2);
 	ASSERT_EQ (block, *latest2);
@@ -203,8 +203,8 @@ TEST (block_store, add_two_items)
 	block2.signature = nano::sign_message (key1.prv, key1.pub, hash2);
 	auto latest2 (store->block_get (transaction, hash2));
 	ASSERT_EQ (nullptr, latest2);
-	store->block_put (transaction, hash1, block);
-	store->block_put (transaction, hash2, block2);
+	store->block_put (transaction, hash1, block, nano::store_hint::key_not_exists);
+	store->block_put (transaction, hash2, block2, nano::store_hint::key_not_exists);
 	auto latest3 (store->block_get (transaction, hash1));
 	ASSERT_NE (nullptr, latest3);
 	ASSERT_EQ (block, *latest3);
@@ -224,13 +224,13 @@ TEST (block_store, add_receive)
 	nano::open_block block1 (0, 1, 0, nano::keypair ().prv, 0, 0);
 	block1.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
-	store->block_put (transaction, block1.hash (), block1);
+	store->block_put (transaction, block1.hash (), block1, nano::store_hint::key_not_exists);
 	nano::receive_block block (block1.hash (), 1, nano::keypair ().prv, 2, 3);
 	block.sideband_set ({});
 	nano::block_hash hash1 (block.hash ());
 	auto latest1 (store->block_get (transaction, hash1));
 	ASSERT_EQ (nullptr, latest1);
-	store->block_put (transaction, hash1, block);
+	store->block_put (transaction, hash1, block, nano::store_hint::key_not_exists);
 	auto latest2 (store->block_get (transaction, hash1));
 	ASSERT_NE (nullptr, latest2);
 	ASSERT_EQ (block, *latest2);
@@ -472,7 +472,7 @@ TEST (block_store, one_block)
 	nano::open_block block1 (0, 1, 0, nano::keypair ().prv, 0, 0);
 	block1.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
-	store->block_put (transaction, block1.hash (), block1);
+	store->block_put (transaction, block1.hash (), block1, nano::store_hint::key_not_exists);
 	ASSERT_TRUE (store->block_exists (transaction, block1.hash ()));
 }
 
@@ -495,7 +495,6 @@ TEST (block_store, one_bootstrap)
 	auto block1 (std::make_shared<nano::send_block> (0, 1, 2, nano::keypair ().prv, 4, 5));
 	auto transaction (store->tx_begin_write ());
 	store->unchecked_put (transaction, block1->hash (), block1);
-	store->flush (transaction);
 	auto begin (store->unchecked_begin (transaction));
 	auto end (store->unchecked_end ());
 	ASSERT_NE (end, begin);
@@ -574,12 +573,12 @@ TEST (block_store, two_block)
 	hashes.push_back (block1.hash ());
 	blocks.push_back (block1);
 	auto transaction (store->tx_begin_write ());
-	store->block_put (transaction, hashes[0], block1);
+	store->block_put (transaction, hashes[0], block1, nano::store_hint::key_not_exists);
 	nano::open_block block2 (0, 1, 2, nano::keypair ().prv, 0, 0);
 	block2.sideband_set ({});
 	hashes.push_back (block2.hash ());
 	blocks.push_back (block2);
-	store->block_put (transaction, hashes[1], block2);
+	store->block_put (transaction, hashes[1], block2, nano::store_hint::key_not_exists);
 	ASSERT_TRUE (store->block_exists (transaction, block1.hash ()));
 	ASSERT_TRUE (store->block_exists (transaction, block2.hash ()));
 }
@@ -812,8 +811,8 @@ TEST (block_store, block_replace)
 	nano::send_block send2 (0, 0, 0, nano::keypair ().prv, 0, 2);
 	send2.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
-	store->block_put (transaction, 0, send1);
-	store->block_put (transaction, 0, send2);
+	store->block_put (transaction, 0, send1, nano::store_hint::key_not_exists);
+	store->block_put (transaction, 0, send2, nano::store_hint::key_exists);
 	auto block3 (store->block_get (transaction, 0));
 	ASSERT_NE (nullptr, block3);
 	ASSERT_EQ (2, block3->block_work ());
@@ -830,7 +829,7 @@ TEST (block_store, block_count)
 		nano::open_block block (0, 1, 0, nano::keypair ().prv, 0, 0);
 		block.sideband_set ({});
 		auto hash1 (block.hash ());
-		store->block_put (transaction, hash1, block);
+		store->block_put (transaction, hash1, block, nano::store_hint::key_not_exists);
 	}
 	auto transaction (store->tx_begin_read ());
 	ASSERT_EQ (1, store->block_count (transaction));
@@ -924,7 +923,6 @@ TEST (block_store, DISABLED_change_dupsort) // Unchecked is no longer dupsort ta
 	ASSERT_NE (send1->hash (), send2->hash ());
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;
@@ -935,7 +933,6 @@ TEST (block_store, DISABLED_change_dupsort) // Unchecked is no longer dupsort ta
 	ASSERT_EQ (0, mdb_dbi_open (store.env.tx (transaction), "unchecked", MDB_CREATE | MDB_DUPSORT, &store.unchecked));
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;
@@ -945,7 +942,6 @@ TEST (block_store, DISABLED_change_dupsort) // Unchecked is no longer dupsort ta
 	ASSERT_EQ (0, mdb_dbi_open (store.env.tx (transaction), "unchecked", MDB_CREATE | MDB_DUPSORT, &store.unchecked));
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;
@@ -967,7 +963,7 @@ TEST (block_store, sequence_flush)
 	auto vote1 (store->vote_generate (transaction, key1.pub, key1.prv, send1));
 	auto seq2 (store->vote_get (transaction, vote1->account));
 	ASSERT_EQ (nullptr, seq2);
-	store->flush (transaction);
+	store->write_cached_votes (transaction);
 	auto seq3 (store->vote_get (transaction, vote1->account));
 	ASSERT_EQ (*seq3, *vote1);
 }
@@ -987,7 +983,7 @@ TEST (block_store, sequence_flush_by_hash)
 	auto vote1 (store->vote_generate (transaction, key1.pub, key1.prv, blocks1));
 	auto seq2 (store->vote_get (transaction, vote1->account));
 	ASSERT_EQ (nullptr, seq2);
-	store->flush (transaction);
+	store->write_cached_votes (transaction);
 	auto seq3 (store->vote_get (transaction, vote1->account));
 	ASSERT_EQ (*seq3, *vote1);
 }
@@ -1006,7 +1002,7 @@ TEST (block_store, state_block)
 		auto transaction (store->tx_begin_write ());
 		store->initialize (transaction, genesis, ledger_cache);
 		ASSERT_EQ (nano::block_type::state, block1.type ());
-		store->block_put (transaction, block1.hash (), block1);
+		store->block_put (transaction, block1.hash (), block1, nano::store_hint::key_not_exists);
 		ASSERT_TRUE (store->block_exists (transaction, block1.hash ()));
 		auto block2 (store->block_get (transaction, block1.hash ()));
 		ASSERT_NE (nullptr, block2);
@@ -1816,7 +1812,7 @@ TEST (block_store, reset_renew_existing_transaction)
 	// Write the block
 	{
 		auto write_transaction (store->tx_begin_write ());
-		store->block_put (write_transaction, hash1, block);
+		store->block_put (write_transaction, hash1, block, nano::store_hint::key_not_exists);
 	}
 
 	read_transaction.renew ();

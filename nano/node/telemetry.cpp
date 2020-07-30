@@ -636,7 +636,7 @@ nano::telemetry_data nano::local_telemetry_data (nano::ledger_cache const & ledg
 	telemetry_data.bandwidth_cap = bandwidth_limit_a;
 	telemetry_data.protocol_version = network_params_a.protocol.protocol_version;
 	telemetry_data.uptime = std::chrono::duration_cast<std::chrono::seconds> (std::chrono::steady_clock::now () - statup_time_a).count ();
-	telemetry_data.unchecked_count = ledger_cache_a.unchecked_count;
+	telemetry_data.unchecked_count = 0; // ledger_cache_a.unchecked_count;
 	telemetry_data.genesis_block = network_params_a.ledger.genesis_hash;
 	telemetry_data.peer_count = nano::narrow_cast<decltype (telemetry_data.peer_count)> (network_a.size ());
 	telemetry_data.account_count = ledger_cache_a.account_count;

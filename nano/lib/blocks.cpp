@@ -1000,6 +1000,8 @@ nano::state_hashables::state_hashables (bool & error_a, nano::stream & stream_a)
 		nano::read (stream_a, representative);
 		nano::read (stream_a, balance);
 		nano::read (stream_a, link);
+
+		std::cout << stream_a.in_avail () << std::endl; // > ???) // version 0 of state block had ?? bytes
 	}
 	catch (std::runtime_error const &)
 	{

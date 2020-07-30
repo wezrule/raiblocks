@@ -514,6 +514,13 @@ enum class tables
 	vote
 };
 
+enum class store_hint
+{
+	key_exists,
+	key_not_exists,
+	none
+};
+
 class transaction_impl
 {
 public:
@@ -587,7 +594,7 @@ class block_store
 public:
 	virtual ~block_store () = default;
 	virtual void initialize (nano::write_transaction const &, nano::genesis const &, nano::ledger_cache &) = 0;
-	virtual void block_put (nano::write_transaction const &, nano::block_hash const &, nano::block const &) = 0;
+	virtual void block_put (nano::write_transaction const &, nano::block_hash const &, nano::block const &, nano::store_hint) = 0;
 	virtual nano::block_hash block_successor (nano::transaction const &, nano::block_hash const &) const = 0;
 	virtual void block_successor_clear (nano::write_transaction const &, nano::block_hash const &) = 0;
 	virtual std::shared_ptr<nano::block> block_get (nano::transaction const &, nano::block_hash const &) const = 0;
@@ -648,7 +655,8 @@ public:
 	virtual std::shared_ptr<nano::vote> vote_max (nano::transaction const &, std::shared_ptr<nano::vote>) = 0;
 	// Return latest vote for an account considering the vote cache
 	virtual std::shared_ptr<nano::vote> vote_current (nano::transaction const &, nano::account const &) = 0;
-	virtual void flush (nano::write_transaction const &) = 0;
+	virtual void flush () { };
+	virtual void write_cached_votes (nano::write_transaction const &) = 0;
 	virtual nano::store_iterator<nano::account, std::shared_ptr<nano::vote>> vote_begin (nano::transaction const &) = 0;
 	virtual nano::store_iterator<nano::account, std::shared_ptr<nano::vote>> vote_end () = 0;
 
@@ -687,6 +695,7 @@ public:
 
 	/** Not applicable to all sub-classes */
 	virtual void serialize_mdb_tracker (boost::property_tree::ptree &, std::chrono::milliseconds, std::chrono::milliseconds) = 0;
+	virtual void serialize_memory_stats (boost::property_tree::ptree &) = 0;
 
 	virtual bool init_error () const = 0;
 

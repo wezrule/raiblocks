@@ -362,9 +362,8 @@ node_seq (seq)
 		}
 
 		nano::genesis genesis;
-		if (!is_initialized)
+		if (!is_initialized && !flags.read_only)
 		{
-			release_assert (!flags.read_only);
 			auto transaction (store.tx_begin_write ({ tables::accounts, tables::blocks, tables::cached_counts, tables::confirmation_height, tables::frontiers }));
 			// Store was empty meaning we just created it, add the genesis block
 			store.initialize (transaction, genesis, ledger.cache);
@@ -424,7 +423,6 @@ node_seq (seq)
 			{
 				auto transaction (store.tx_begin_write ({ tables::unchecked }));
 				store.unchecked_clear (transaction);
-				ledger.cache.unchecked_count = 0;
 				logger.always_log ("Dropping unchecked blocks");
 			}
 		}
@@ -527,14 +525,18 @@ void nano::node::process_fork (nano::transaction const & transaction_a, std::sha
 		if (ledger_block && !block_confirmed_or_being_confirmed (transaction_a, ledger_block->hash ()) && (ledger.can_vote (transaction_a, *ledger_block) || modified_a < nano::seconds_since_epoch () - 300 || !block_arrival.recent (block_a->hash ())))
 		{
 			std::weak_ptr<nano::node> this_w (shared_from_this ());
-			auto election = active.insert (ledger_block, boost::none, [this_w, root](std::shared_ptr<nano::block>) {
+			auto election = active.insert (ledger_block, boost::none, [this_w, root, block_type=block_a->type ()](std::shared_ptr<nano::block>) {
 				if (auto this_l = this_w.lock ())
 				{
 					auto attempt (this_l->bootstrap_initiator.current_attempt ());
 					if (attempt && attempt->mode == nano::bootstrap_mode::legacy)
 					{
 						auto transaction (this_l->store.tx_begin_read ());
-						auto account (this_l->ledger.store.frontier_get (transaction, root));
+						nano::account account{ 0 };
+						if (block_type == nano::block_type::receive || block_type == nano::block_type::send || block_type == nano::block_type::change || block_type == nano::block_type::open)
+						{
+							account = (this_l->ledger.store.frontier_get (transaction, root));
+						}
 						if (!account.is_zero ())
 						{
 							this_l->bootstrap_initiator.connections->requeue_pull (nano::pull_info (account, root, root, attempt->incremental_id));
@@ -637,6 +639,7 @@ void nano::node::start ()
 		rep_crawler.start ();
 	}
 	ongoing_rep_calculation ();
+	ongoing_vote_store ();
 	ongoing_peer_store ();
 	ongoing_online_weight_calculation_queue ();
 	bool tcp_enabled (false);
@@ -770,10 +773,11 @@ nano::uint128_t nano::node::minimum_principal_weight (nano::uint128_t const & on
 	return online_stake / network_params.network.principal_weight_factor;
 }
 
+// Only called during startup
 void nano::node::long_inactivity_cleanup ()
 {
 	bool perform_cleanup = false;
-	auto transaction (store.tx_begin_write ({ tables::online_weight, tables::peers }));
+	auto transaction (store.tx_begin_write ({}, { tables::online_weight, tables::peers }));
 	if (store.online_weight_count (transaction) > 0)
 	{
 		auto i (store.online_weight_begin (transaction));
@@ -830,14 +834,30 @@ void nano::node::ongoing_bootstrap ()
 	});
 }
 
-void nano::node::ongoing_store_flush ()
+void nano::node::ongoing_vote_store ()
 {
 	{
 		auto transaction (store.tx_begin_write ({ tables::vote }));
-		store.flush (transaction);
+		store.write_cached_votes (transaction);
 	}
 	std::weak_ptr<nano::node> node_w (shared_from_this ());
 	alarm.add (std::chrono::steady_clock::now () + std::chrono::seconds (5), [node_w]() {
+		if (auto node_l = node_w.lock ())
+		{
+			node_l->worker.push_task ([node_l]() {
+				node_l->ongoing_vote_store ();
+			});
+		}
+	});
+}
+
+void nano::node::ongoing_store_flush ()
+{
+	{
+		store.flush ();
+	}
+	std::weak_ptr<nano::node> node_w (shared_from_this ());
+	alarm.add (std::chrono::steady_clock::now () + std::chrono::minutes (5), [node_w]() {
 		if (auto node_l = node_w.lock ())
 		{
 			node_l->worker.push_task ([node_l]() {
@@ -956,8 +976,6 @@ void nano::node::unchecked_cleanup ()
 			if (store.unchecked_exists (transaction, key))
 			{
 				store.unchecked_del (transaction, key);
-				debug_assert (ledger.cache.unchecked_count > 0);
-				--ledger.cache.unchecked_count;
 			}
 		}
 	}
@@ -1685,7 +1703,6 @@ nano::node_flags const & nano::inactive_node_flag_defaults ()
 	node_flags.read_only = true;
 	node_flags.generate_cache.reps = false;
 	node_flags.generate_cache.cemented_count = false;
-	node_flags.generate_cache.unchecked_count = false;
 	node_flags.generate_cache.account_count = false;
 	node_flags.generate_cache.epoch_2 = false;
 	node_flags.disable_bootstrap_listener = true;
