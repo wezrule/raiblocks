@@ -184,17 +184,24 @@ void nano::active_transactions::block_cemented_callback (std::shared_ptr<nano::b
 			}
 		}
 
-		// Start or vote for the next unconfirmed block in this account
-		auto const & account (!block_a->account ().is_zero () ? block_a->account () : block_a->sideband ().account);
-		debug_assert (!account.is_zero ());
-		activate (account);
+		node.background ([block_a, node_w = std::weak_ptr<nano::node> (node.shared_from_this ())]() {
+			if (auto node_l = node_w.lock ())
+			{
+				auto transaction = node_l->store.tx_begin_read ();
+				auto const & destination (node_l->ledger.block_destination (transaction, *block_a));
 
-		// Start or vote for the next unconfirmed block in the destination account
-		auto const & destination (node.ledger.block_destination (transaction, *block_a));
-		if (!destination.is_zero ())
-		{
-			activate (destination);
-		}
+				// Start or vote for the next unconfirmed block in this account
+				auto const & account (!block_a->account ().is_zero () ? block_a->account () : block_a->sideband ().account);
+				debug_assert (!account.is_zero ());
+				node_l->active.activate (account);
+
+				// Start or vote for the next unconfirmed block in the destination account
+				if (!destination.is_zero ())
+				{
+					node_l->active.activate (destination);
+				}
+			}
+		});
 	}
 }
 
