@@ -777,7 +777,7 @@ protected:
 		return static_cast<Derived_Store &> (*this).del (transaction_a, table_a, key_a);
 	}
 
-	virtual size_t count (nano::transaction const & transaction_a, tables table_a) const = 0;
+	virtual uint64_t count (nano::transaction const & transaction_a, tables table_a) const = 0;
 	virtual int drop (nano::write_transaction const & transaction_a, tables table_a) = 0;
 	virtual bool not_found (int status) const = 0;
 	virtual bool success (int status) const = 0;
