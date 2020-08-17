@@ -48,7 +48,18 @@ nano::active_transactions::~active_transactions ()
 	stop ();
 }
 
-void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction const & transaction_a)
+void nano::active_transactions::insert_election_from_frontiers_confirmation (std::shared_ptr<nano::block> const & block_a, nano::account const & account_a, nano::uint128_t previous_balance_a, uint64_t & elections_count_a)
+{
+	auto insert_result = insert (block_a, previous_balance_a);
+	if (insert_result.inserted)
+	{
+		insert_result.election->transition_active ();
+		++elections_count_a;
+		optimistic_frontier_elections.emplace (account_a, insert_result.election);
+	}
+}
+
+bool nano::active_transactions::confirm_prioritized_frontiers (nano::transaction const & transaction_a)
 {
 	// Limit maximum count of elections to start
 	auto rep_counts (node.wallets.reps ());
@@ -59,13 +70,15 @@ void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction
 	auto is_dev_network = node.network_params.network.is_dev_network ();
 	auto roots_size = size ();
 	auto check_time_exceeded = std::chrono::steady_clock::now () >= next_frontier_check;
-	auto max_elections = 1000ull;
+	auto max_elections = 10ull;
 	auto low_active_elections = roots_size < max_elections;
 	bool wallets_check_required = (!skip_wallets || !priority_wallet_cementable_frontiers.empty ()) && !agressive_mode;
 	// Minimise dropping real-time transactions, set the number of frontiers added to a factor of the maximum number of possible active elections
-	auto max_active = node.config.active_elections_size / 20;
+	auto max_active = node.config.active_elections_size / 200;
+	auto should_confirm{ false };
 	if (roots_size <= max_active && (check_time_exceeded || wallets_check_required || (!is_dev_network && low_active_elections && agressive_mode)))
 	{
+		should_confirm = true;
 		// When the number of active elections is low increase max number of elections for setting confirmation height.
 		if (max_active > roots_size + max_elections)
 		{
@@ -85,7 +98,7 @@ void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction
 				auto error = this->node.store.account_get (transaction_a, cementable_account.account, info);
 				if (!error)
 				{
-					if (!this->confirmation_height_processor.is_processing_block (info.head))
+					if (!this->confirmation_height_processor.is_processing_block (info.head) && optimistic_frontier_elections.count (cementable_account.account) == 0)
 					{
 						nano::confirmation_height_info confirmation_height_info;
 						error = this->node.store.confirmation_height_get (transaction_a, cementable_account.account, confirmation_height_info);
@@ -95,12 +108,7 @@ void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction
 						{
 							auto block (this->node.store.block_get (transaction_a, info.head));
 							auto previous_balance (this->node.ledger.balance (transaction_a, block->previous ()));
-							auto insert_result = this->insert (block, previous_balance);
-							if (insert_result.inserted)
-							{
-								insert_result.election->transition_active ();
-								++elections_count;
-							}
+							this->insert_election_from_frontiers_confirmation (block, cementable_account.account, previous_balance, elections_count);
 						}
 					}
 				}
@@ -117,6 +125,8 @@ void nano::active_transactions::confirm_prioritized_frontiers (nano::transaction
 
 		next_frontier_check = steady_clock::now () + (rel_time_next_frontier_check / dev_network_factor);
 	}
+
+	return should_confirm;
 }
 
 void nano::active_transactions::block_cemented_callback (std::shared_ptr<nano::block> const & block_a)
@@ -297,13 +307,123 @@ void nano::active_transactions::frontiers_confirmation (nano::unique_lock<std::m
 		auto request_interval = std::chrono::milliseconds (node.network_params.network.request_interval_ms);
 		// Spend longer searching ledger accounts when there is a low amount of elections going on
 		auto low_active = roots.size () < 1000;
-		auto time_spent_prioritizing_ledger_accounts = request_interval / (low_active ? 20 : 100);
+		auto time_spent_prioritizing_ledger_accounts = request_interval / (low_active ? 100 : 500);
 		auto time_spent_prioritizing_wallet_accounts = request_interval / 250;
+		auto time_spent_confirming_pessimistic_account = request_interval / (low_active ? 20 : 100);
 		lock_a.unlock ();
 		auto transaction = node.store.tx_begin_read ();
-		prioritize_frontiers_for_confirmation (transaction, node.network_params.network.is_dev_network () ? std::chrono::milliseconds (50) : time_spent_prioritizing_ledger_accounts, time_spent_prioritizing_wallet_accounts);
-		confirm_prioritized_frontiers (transaction);
+		//prioritize_frontiers_for_confirmation (transaction, node.network_params.network.is_dev_network () ? std::chrono::milliseconds (50) : time_spent_prioritizing_ledger_accounts, time_spent_prioritizing_wallet_accounts);
+		//auto should_confirm = confirm_prioritized_frontiers (transaction);
+		//if (should_confirm)
+		//{
+			confirm_deepest_uncemented_blocks (transaction, node.network_params.network.is_dev_network () ? std::chrono::milliseconds (50) : time_spent_confirming_pessimistic_account);
+		//}
 		lock_a.lock ();
+	}
+}
+
+void nano::active_transactions::confirm_deepest_uncemented_blocks (nano::transaction const & transaction_a, std::chrono::milliseconds account_traversal_a)
+{
+	auto i{ node.store.latest_begin (transaction_a, next_pessimistic_account) };
+	auto n{ node.store.latest_end () };
+	nano::timer<std::chrono::milliseconds> timer (nano::timer_state::started);
+	nano::confirmation_height_info confirmation_height_info;
+
+	/* Check less frequently for regular nodes in auto mode */
+	auto roots_size = size ();
+	auto max_elections = 1000ull;
+	auto low_active_elections = roots_size < max_elections;
+	// Minimise dropping real-time transactions, set the number of frontiers added to a factor of the maximum number of possible active elections
+	auto max_active = node.config.active_elections_size / 20;
+
+	// When the number of active elections is low increase max number of elections for setting confirmation height.
+	if (max_active > roots_size + max_elections)
+	{
+		max_elections = max_active - roots_size;
+	}
+
+	size_t elections_count (0);
+	for (; i != n && !stopped && elections_count < max_elections; ++i)
+	{
+		auto const & account{ i->first };
+		auto const & account_info{ i->second };
+		node.store.confirmation_height_get (transaction_a, account, confirmation_height_info);
+
+		if (account_info.block_count > confirmation_height_info.height && optimistic_elections.get<tag_account> ().count (account) == 0)
+		{
+			std::shared_ptr<nano::block> previous_block;
+			std::shared_ptr<nano::block> block;
+			if (confirmation_height_info.height == 0)
+			{
+				block = node.store.block_get (transaction_a, account_info.open_block);
+			}
+			else
+			{
+				previous_block = node.store.block_get (transaction_a, confirmation_height_info.frontier);
+				block = node.store.block_get (transaction_a, previous_block->sideband ().successor);
+			}
+
+			if (block && !node.confirmation_height_processor.is_processing_block (block->hash ()))
+			{
+				auto source{ block->source () };
+				if (source.is_zero ())
+				{
+					source = block->link ();
+				}
+
+				auto should_start_election{ false };
+
+				// Check if the source is confirmed before trying to confirm the open
+				if (!source.is_zero () && !node.ledger.is_epoch_link (source))
+				{
+					auto source_block{ node.store.block_get (transaction_a, source) };
+					if (source_block)
+					{
+						auto source_account{ source_block->account () };
+						if (source_account.is_zero ())
+						{
+							source_account = source_block->sideband ().account;
+						}
+						debug_assert (source_account);
+						nano::confirmation_height_info source_confirmation_height_info;
+						node.store.confirmation_height_get (transaction_a, source_account, source_confirmation_height_info);
+						should_start_election = source_confirmation_height_info.height >= source_block->sideband ().height;
+					}
+					else
+					{
+						should_start_election = true;
+					}
+				}
+				else
+				{
+					should_start_election = true;
+				}
+
+				if (should_start_election)
+				{
+					// Source is confirmed, so we can confirm this block
+					nano::uint128_t previous_balance{ 0 };
+					if (previous_block && previous_block->balance ().is_zero ())
+					{
+						previous_balance = previous_block->sideband ().balance.number ();
+					}
+
+					insert_election_from_frontiers_confirmation (block, account, previous_balance, elections_count);
+				}
+			}
+		}
+
+		next_pessimistic_account = account.number () + 1;
+		if (timer.since_start () >= account_traversal_a)
+		{
+			break;
+		}
+	}
+
+	// Go back to the beginning when we have reached the end of the accounts and start with wallet accounts next time
+	if (i == n)
+	{
+		next_pessimistic_account = 0;
 	}
 }
 
@@ -439,38 +559,41 @@ void nano::active_transactions::prioritize_account_for_confirmation (nano::activ
 	{
 		auto num_uncemented = info_a.block_count - confirmation_height;
 		nano::lock_guard<std::mutex> guard (mutex);
-		auto it = cementable_frontiers_a.get<tag_account> ().find (account_a);
-		if (it != cementable_frontiers_a.get<tag_account> ().end ())
+		if (optimistic_elections.get<tag_account> ().count (account_a) == 0)
 		{
-			if (it->blocks_uncemented != num_uncemented)
+			auto it = cementable_frontiers_a.get<tag_account> ().find (account_a);
+			if (it != cementable_frontiers_a.get<tag_account> ().end ())
 			{
-				// Account already exists and there is now a different uncemented block count so update it in the container
-				cementable_frontiers_a.get<tag_account> ().modify (it, [num_uncemented](nano::cementable_account & info) {
-					info.blocks_uncemented = num_uncemented;
-				});
-			}
-		}
-		else
-		{
-			debug_assert (cementable_frontiers_size_a <= max_priority_cementable_frontiers);
-			if (cementable_frontiers_size_a == max_priority_cementable_frontiers)
-			{
-				// The maximum amount of frontiers stored has been reached. Check if the current frontier
-				// has more uncemented blocks than the lowest uncemented frontier in the collection if so replace it.
-				auto least_uncemented_frontier_it = cementable_frontiers_a.get<tag_uncemented> ().end ();
-				--least_uncemented_frontier_it;
-				if (num_uncemented > least_uncemented_frontier_it->blocks_uncemented)
+				if (it->blocks_uncemented != num_uncemented)
 				{
-					cementable_frontiers_a.get<tag_uncemented> ().erase (least_uncemented_frontier_it);
-					cementable_frontiers_a.get<tag_account> ().emplace (account_a, num_uncemented);
+					// Account already exists and there is now a different uncemented block count so update it in the container
+					cementable_frontiers_a.get<tag_account> ().modify (it, [num_uncemented](nano::cementable_account & info) {
+						info.blocks_uncemented = num_uncemented;
+					});
 				}
 			}
 			else
 			{
-				cementable_frontiers_a.get<tag_account> ().emplace (account_a, num_uncemented);
+				debug_assert (cementable_frontiers_size_a <= max_priority_cementable_frontiers);
+				if (cementable_frontiers_size_a == max_priority_cementable_frontiers)
+				{
+					// The maximum amount of frontiers stored has been reached. Check if the current frontier
+					// has more uncemented blocks than the lowest uncemented frontier in the collection if so replace it.
+					auto least_uncemented_frontier_it = cementable_frontiers_a.get<tag_uncemented> ().end ();
+					--least_uncemented_frontier_it;
+					if (num_uncemented > least_uncemented_frontier_it->blocks_uncemented)
+					{
+						cementable_frontiers_a.get<tag_uncemented> ().erase (least_uncemented_frontier_it);
+						cementable_frontiers_a.get<tag_account> ().emplace (account_a, num_uncemented);
+					}
+				}
+				else
+				{
+					cementable_frontiers_a.get<tag_account> ().emplace (account_a, num_uncemented);
+				}
 			}
+			cementable_frontiers_size_a = cementable_frontiers_a.size ();
 		}
-		cementable_frontiers_size_a = cementable_frontiers_a.size ();
 	}
 }
 
@@ -486,8 +609,17 @@ void nano::active_transactions::prioritize_frontiers_for_confirmation (nano::tra
 			priority_cementable_frontiers_size = priority_cementable_frontiers.size ();
 			priority_wallet_cementable_frontiers_size = priority_wallet_cementable_frontiers.size ();
 		}
-		nano::timer<std::chrono::milliseconds> wallet_account_timer;
-		wallet_account_timer.start ();
+
+		// Clean up old optimistic_elections
+		for (auto i{ optimistic_elections.get<tag_election_started> ().begin () }; i != optimistic_elections.get<tag_election_started> ().end (); ++i)
+		{
+			if (i->election_started + 5min < std::chrono::steady_clock::now ())
+			{
+				i = optimistic_elections.get<tag_election_started> ().erase (i);
+			}
+		}
+
+		nano::timer<std::chrono::milliseconds> wallet_account_timer (nano::timer_state::started);
 
 		if (!skip_wallets)
 		{
@@ -557,9 +689,7 @@ void nano::active_transactions::prioritize_frontiers_for_confirmation (nano::tra
 			}
 		}
 
-		nano::timer<std::chrono::milliseconds> timer;
-		timer.start ();
-
+		nano::timer<std::chrono::milliseconds> timer (nano::timer_state::started);
 		auto i (node.store.latest_begin (transaction_a, next_frontier_account));
 		auto n (node.store.latest_end ());
 		nano::confirmation_height_info confirmation_height_info;
