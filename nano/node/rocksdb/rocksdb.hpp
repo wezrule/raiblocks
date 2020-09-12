@@ -12,7 +12,7 @@
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/table.h>
-#include <rocksdb/utilities/optimistic_transaction_db.h>
+//#include <rocksdb/utilities/optimistic_transaction_db.h>
 #include <rocksdb/utilities/transaction.h>
 
 namespace nano
@@ -66,7 +66,8 @@ private:
 	bool error{ false };
 	nano::logger_mt & logger;
 	// Optimistic transactions are used in write mode
-	rocksdb::OptimisticTransactionDB * optimistic_db = nullptr;
+//	rocksdb::OptimisticTransactionDB * optimistic_db = nullptr;
+	rocksdb::TransactionDB * pessimistic_db = nullptr;
 	std::unique_ptr<rocksdb::DB> db;
 	std::vector<std::unique_ptr<rocksdb::ColumnFamilyHandle>> handles;
 	std::shared_ptr<rocksdb::TableFactory> small_table_factory;
@@ -99,7 +100,7 @@ private:
 	void open (bool & error_a, boost::filesystem::path const & path_a, bool open_read_only_a);
 
 	void construct_column_family_mutexes ();
-	rocksdb::Options get_db_options ();
+	rocksdb::DBOptions get_db_options ();
 	rocksdb::ColumnFamilyOptions get_active_cf_options (std::shared_ptr<rocksdb::TableFactory> const & table_factory_a, unsigned long long memtable_size_bytes_a) const;
 	rocksdb::ColumnFamilyOptions get_small_cf_options (std::shared_ptr<rocksdb::TableFactory> const & table_factory_a) const;
 	rocksdb::BlockBasedTableOptions get_active_table_options (int lru_size) const;

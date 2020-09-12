@@ -1,5 +1,9 @@
 #include <nano/node/rocksdb/rocksdb_txn.hpp>
 
+#include <rocksdb/utilities/transaction.h>
+
+#include <rocksdb/options.h>
+
 nano::read_rocksdb_txn::read_rocksdb_txn (rocksdb::DB * db_a) :
 db (db_a)
 {
@@ -32,6 +36,7 @@ void * nano::read_rocksdb_txn::get_handle () const
 	return (void *)&options;
 }
 
+/*
 nano::write_rocksdb_txn::write_rocksdb_txn (rocksdb::OptimisticTransactionDB * db_a, std::vector<nano::tables> const & tables_requiring_locks_a, std::vector<nano::tables> const & tables_no_locks_a, std::unordered_map<nano::tables, std::mutex> & mutexes_a) :
 db (db_a),
 tables_requiring_locks (tables_requiring_locks_a),
@@ -40,6 +45,21 @@ mutexes (mutexes_a)
 {
 	lock ();
 	rocksdb::OptimisticTransactionOptions txn_options;
+	txn_options.set_snapshot = true;
+	txn = db->BeginTransaction (rocksdb::WriteOptions (), txn_options);
+}
+*/
+
+nano::write_rocksdb_txn::write_rocksdb_txn (rocksdb::TransactionDB * db_a, std::vector<nano::tables> const & tables_requiring_locks_a, std::vector<nano::tables> const & tables_no_locks_a, std::unordered_map<nano::tables, std::mutex> & mutexes_a) :
+db (db_a),
+tables_requiring_locks (tables_requiring_locks_a),
+tables_no_locks (tables_no_locks_a),
+mutexes (mutexes_a)
+{
+	lock ();
+	rocksdb::TransactionOptions txn_options;
+	txn_options.deadlock_detect = false;
+	txn_options.skip_concurrency_control = false;
 	txn_options.set_snapshot = true;
 	txn = db->BeginTransaction (rocksdb::WriteOptions (), txn_options);
 }
@@ -69,7 +89,9 @@ void nano::write_rocksdb_txn::commit () const
 
 void nano::write_rocksdb_txn::renew ()
 {
-	rocksdb::OptimisticTransactionOptions txn_options;
+	rocksdb::TransactionOptions txn_options;
+	txn_options.deadlock_detect = false;
+	txn_options.skip_concurrency_control = false;
 	txn_options.set_snapshot = true;
 	db->BeginTransaction (rocksdb::WriteOptions (), txn_options, txn);
 }

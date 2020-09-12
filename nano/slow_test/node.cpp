@@ -389,17 +389,183 @@ TEST (peer_container, random_set)
 // Can take up to 2 hours
 TEST (store, unchecked_load)
 {
-	nano::system system (1);
-	auto & node (*system.nodes[0]);
-	auto block (std::make_shared<nano::send_block> (0, 0, 0, nano::dev_genesis_key.prv, nano::dev_genesis_key.pub, 0));
-	constexpr auto num_unchecked = 1000000;
-	for (auto i (0); i < 1000000; ++i)
+	auto path = nano::unique_path ();
+	constexpr auto num_unchecked = 5000; // 10000000; // 2000000; // 5000000; //30000000;
+
 	{
-		auto transaction (node.store.tx_begin_write ());
-		node.store.unchecked_put (transaction, i, block);
+		nano::logger_mt logger;
+		// Update defaults
+	//	nano::rocksdb_config rocksdb_config;
+
+		auto store = nano::make_store (logger, path, false, true);
+		ASSERT_FALSE (store->init_error ());
+		auto block (std::make_shared<nano::send_block> (0, 0, 0, nano::dev_genesis_key.prv, nano::dev_genesis_key.pub, 0));
+		/*
+		{
+			auto transaction (store->tx_begin_write ());
+			nano::ledger_cache ledger_cache;
+			nano::genesis gensis;
+			store->initialize (transaction, gensis, ledger_cache);
+			nano::work_pool pool (std::numeric_limits<unsigned>::max ());
+			nano::send_block send (nano::genesis_hash, nano::test_genesis_key.pub, nano::genesis_amount, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *pool.generate (nano::genesis_hash));
+			send.sideband_set ({});
+			store->block_put (transaction, send.hash (), send, nano::store_hint::key_not_exists);
+			store->block_del (transaction, send.hash ());
+			store->block_put (transaction, send.hash (), send, nano::store_hint::key_not_exists);
+			store->block_del (transaction, send.hash ());
+			store->block_put (transaction, send.hash (), send, nano::store_hint::key_not_exists);
+			nano::send_block send1 (nano::genesis_hash, nano::test_genesis_key.pub, nano::genesis_amount, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *pool.generate (nano::genesis_hash));
+			send1.sideband_set ({});
+			store->block_put (transaction, send1.hash (), send1, nano::store_hint::key_not_exists);
+		}*/
+
+		std::vector<int> keys(num_unchecked);
+		std::iota (keys.begin(), keys.end (), 0);
+		std::random_device rd;
+		std::mt19937 g(rd());
+		std::shuffle (keys.begin (), keys.end (), g);
+
+//		std::unordered_set<int> keys_to_delete(num_unchecked);
+//		std::iota (keys_to_delete.begin(), keys_to_delete.end (), 0);
+//		std::shuffle (keys_to_delete.begin (), keys_to_delete.end (), g);
+
+		//keys_to_delete.erase (keys_to_delete.begin (), keys_to_delete.begin () + keys_to_delete.size () / 2);
+
+//		keys_to_delete.resize (keys_to_delete.size () / 2);
+
+		auto del = false;
+
+		for (auto i = 0; i < num_unchecked; ++i)
+		{
+			auto key = keys[i];
+			auto transaction (store->tx_begin_write ());
+			store->unchecked_put (transaction, key, block);
+			//store->unchecked_put (transaction, key, block);
+
+			// Delete every other one
+			if (del)
+				store->unchecked_del (transaction, { key, block->hash () });
+//			else
+
+		//	store->unchecked_get (transaction, key);
+
+			del ^= true;
+		}
+
+		{
+//			auto transaction (store->tx_begin_read ());
+//			ASSERT_EQ (num_unchecked, store->unchecked_count (transaction));		
+		}
+
+	//	for (auto key : keys_to_delete)
+	//	{
+	//		auto transaction (store->tx_begin_write ());
+	//		store->unchecked_del (transaction, { key, block->hash () });
+	//	}
+
+	//	for (auto i = 0; i < num_unchecked; ++i)
+	//	{
+	//		auto transaction (store->tx_begin_read ());
+	//		store->unchecked_get (transaction, i);
+	//	}
+		//{
+	//	auto transaction (store->tx_begin_read ());
+	//	ASSERT_EQ (num_unchecked, store->unchecked_count (transaction));
+		//ASSERT_EQ (3, store->block_count (transaction));
+		//}
+
+		// Delete half
+	//	for (auto i (0); i < num_unchecked; i += 2)
+	//	{
+	//		auto transaction (store->tx_begin_write ());
+	//		store->unchecked_del (transaction, { nano::block_hash (i), block->hash () });
+
+			// Do gets  
+
+		//}
+
+	//	auto sum = 0;
+	//	auto transaction (store->tx_begin_read ());
+		// I want point lookups!
+	//	for (auto i (0); i < num_unchecked; ++i)
+	//	{
+	//		auto transaction (store->tx_begin_write ());
+	//		store->unchecked_get (transaction, i);
+	//	}
+
+
+	//	for (auto i (store->unchecked_begin (transaction)); i != store->unchecked_end (); ++i)
+	//	{
+	//		sum++;
+	//	}
+
+		//ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
 	}
-	auto transaction (node.store.tx_begin_read ());
-	ASSERT_EQ (num_unchecked, node.store.unchecked_count (transaction));
+
+	nano::timer<> timer (nano::timer_state::started);
+
+	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+//		std::this_thread::sleep_for (10s);
+
+		auto transaction (store->tx_begin_read ());
+
+	//	auto sum = 0;
+	//	for (auto i (store->unchecked_begin (transaction)); i != store->unchecked_end (); ++i)
+	//	{
+	//		sum++;
+	//	}
+	//	ASSERT_EQ (num_unchecked / 2, sum);
+
+		auto db_sum = store->unchecked_count (transaction);
+		ASSERT_EQ (num_unchecked / 2, db_sum);
+	}
+
+	std::cout << timer.since_start ().count () << "ms" << std::endl;
+
+	timer.restart ();
+
+	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto transaction (store->tx_begin_read ());
+
+		auto sum = 0;
+		for (auto i (store->unchecked_begin (transaction)); i != store->unchecked_end (); ++i)
+		{
+			sum++;
+		}
+		ASSERT_EQ (num_unchecked / 2, sum);
+		auto db_sum = store->unchecked_count (transaction);
+		ASSERT_EQ (sum, db_sum);
+	}
+
+	std::cout << timer.since_start ().count () << "ms" << std::endl;
+
+
+/*	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto transaction (store->tx_begin_read ());
+	//	ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
+		ASSERT_EQ (3, store->block_count (transaction));
+	}
+	{
+		nano::logger_mt logger;
+		nano::rocksdb_config rocksdb_config;
+		auto store = nano::make_store (logger, path, false, true, rocksdb_config);
+		ASSERT_FALSE (store->init_error ());
+		auto transaction (store->tx_begin_read ());
+	//	ASSERT_EQ (num_unchecked - 1, store->unchecked_count (transaction));
+		ASSERT_EQ (3, store->block_count (transaction));
+	}*/
 }
 
 TEST (store, vote_load)

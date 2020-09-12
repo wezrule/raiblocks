@@ -15,6 +15,12 @@
 #include <rocksdb/utilities/backupable_db.h>
 #include <rocksdb/utilities/transaction.h>
 #include <rocksdb/utilities/transaction_db.h>
+//#include <rocksdb/utilities/sync>
+
+#include <rocksdb/utilities/transaction_db.h>
+#include <rocksdb/utilities/optimistic_transaction_db.h>
+
+//#include <rocksdb/utilities/pessimistic_transaction.h>
 
 namespace
 {
@@ -107,24 +113,43 @@ std::unordered_map<const char *, nano::tables> nano::rocksdb_store::create_cf_na
 void nano::rocksdb_store::open (bool & error_a, boost::filesystem::path const & path_a, bool open_read_only_a)
 {
 	auto column_families = create_column_families ();
-	auto options = get_db_options ();
+	auto db_options = get_db_options ();
 	rocksdb::Status s;
 
 	std::vector<rocksdb::ColumnFamilyHandle *> handles_l;
+//	rocksdb::DB * db_l;
 	if (open_read_only_a)
 	{
 		rocksdb::DB * db_l;
-		s = rocksdb::DB::OpenForReadOnly (options, path_a.string (), column_families, &handles_l, &db_l);
+		s = rocksdb::DB::OpenForReadOnly (db_options, path_a.string (), column_families, &handles_l, &db_l);
 		db.reset (db_l);
 	}
 	else
 	{
-		s = rocksdb::OptimisticTransactionDB::Open (options, path_a.string (), column_families, &handles_l, &optimistic_db);
-		if (optimistic_db)
+		rocksdb::TransactionDBOptions dbOptions;
+		dbOptions.skip_concurrency_control = true;
+
+		s = rocksdb::TransactionDB::Open (db_options, dbOptions, path_a.string (), column_families, &handles_l, &pessimistic_db);
+		if (pessimistic_db)
 		{
-			db.reset (optimistic_db);
+			db.reset (pessimistic_db);
 		}
 	}
+
+	//	s = rocksdb::DB::Open (options, path_a.string (), column_families, &handles_l, &db_l);
+
+//		s = rocksdb::PessimisticTransactionDB::Open (options, path_a.string (), column_families, &handles_l, &pessimistic_db);
+//		if (optimistic_db)
+//		{
+//			db.reset (optimistic_db);
+//		}
+//	}
+//	db.reset (db_l);
+
+	rocksdb::CompactRangeOptions compactRangeOptions; 
+	compactRangeOptions.allow_write_stall = true;
+	compactRangeOptions.max_subcompactions = 8;
+	db->CompactRange (compactRangeOptions, nullptr, nullptr); // &start_slice, &end_slice, false, 1, 0);
 
 	handles.resize (handles_l.size ());
 	for (auto i = 0; i < handles_l.size (); ++i)
@@ -145,6 +170,34 @@ void nano::rocksdb_store::open (bool & error_a, boost::filesystem::path const & 
 			logger.always_log (boost::str (boost::format ("The version of the ledger (%1%) is too high for this node") % version_l));
 		}
 	}
+
+//  rocksdb::SyncPoint::GetInstance()->LoadDependency({
+ //     {"CompactFilesImpl:0", "BackgroundCallCompaction:0"},
+  //    {"BackgroundCallCompaction:1", "CompactFilesImpl:1"},
+ // });
+ // rocksdb::SyncPoint::GetInstance()->EnableProcessing();
+
+	uint8_t start { 0 };
+	rocksdb::Slice start_slice (reinterpret_cast<const char *> (&start), 1);
+	std::vector<uint8_t> end (sizeof (nano::unchecked_key), 255);
+	rocksdb::Slice end_slice (reinterpret_cast<const char *> (end.data ()), end.size ());
+
+	/*
+	rocksdb::ColumnFamilyMetaData meta;
+	db->GetColumnFamilyMetaData (table_to_column_family (nano::tables::unchecked), &meta);
+	std::vector<std::string> files;
+	for (auto & file : meta.levels[0].files)
+	{
+		files.push_back ((boost::filesystem::path (file.db_path).append (file.name)).string ());
+	}
+
+	rocksdb::CompactionOptions compactOptions;
+	compactOptions.max_subcompactions = 8;
+	compactOptions.compression = rocksdb::CompressionType::kDisableCompressionOption;
+
+	db->CompactFiles (compactOptions, files, 0); // table_to_column_family (nano::tables::unchecked), &start_slice, &end_slice);
+*/
+
 }
 
 void nano::rocksdb_store::generate_tombstone_map ()
@@ -251,15 +304,15 @@ std::vector<rocksdb::ColumnFamilyDescriptor> nano::rocksdb_store::create_column_
 nano::write_transaction nano::rocksdb_store::tx_begin_write (std::vector<nano::tables> const & tables_requiring_locks_a, std::vector<nano::tables> const & tables_no_locks_a)
 {
 	std::unique_ptr<nano::write_rocksdb_txn> txn;
-	release_assert (optimistic_db != nullptr);
+	release_assert (pessimistic_db != nullptr);
 	if (tables_requiring_locks_a.empty () && tables_no_locks_a.empty ())
 	{
 		// Use all tables if none are specified
-		txn = std::make_unique<nano::write_rocksdb_txn> (optimistic_db, all_tables (), tables_no_locks_a, write_lock_mutexes);
+		txn = std::make_unique<nano::write_rocksdb_txn> (pessimistic_db, all_tables (), tables_no_locks_a, write_lock_mutexes);
 	}
 	else
 	{
-		txn = std::make_unique<nano::write_rocksdb_txn> (optimistic_db, tables_requiring_locks_a, tables_no_locks_a, write_lock_mutexes);
+		txn = std::make_unique<nano::write_rocksdb_txn> (pessimistic_db, tables_requiring_locks_a, tables_no_locks_a, write_lock_mutexes);
 	}
 
 	// Tables must be kept in alphabetical order. These can be used for mutex locking, so order is important to prevent deadlocking
@@ -562,21 +615,23 @@ void nano::rocksdb_store::construct_column_family_mutexes ()
 	}
 }
 
-rocksdb::Options nano::rocksdb_store::get_db_options ()
+rocksdb::DBOptions nano::rocksdb_store::get_db_options ()
 {
-	rocksdb::Options db_options;
+	rocksdb::DBOptions db_options;
 	db_options.create_if_missing = true;
 	db_options.create_missing_column_families = true;
 
 	// Sets the compaction priority
-	db_options.compaction_pri = rocksdb::CompactionPri::kMinOverlappingRatio;
+//	db_options.compaction_pri = rocksdb::CompactionPri::kMinOverlappingRatio;
 
 	// Start aggressively flushing WAL files when they reach over 1GB
 	db_options.max_total_wal_size = 1 * 1024 * 1024 * 1024LL;
 
 	// Optimize RocksDB. This is the easiest way to get RocksDB to perform well
 	db_options.IncreaseParallelism (rocksdb_config.io_threads);
-	db_options.OptimizeLevelStyleCompaction ();
+//	db_options.max_subcompactions = 4;
+
+//	db_options.OptimizeLevelStyleCompaction ();
 
 	// Adds a separate write queue for memtable/WAL
 	db_options.enable_pipelined_write = true;
@@ -610,6 +665,10 @@ rocksdb::BlockBasedTableOptions nano::rocksdb_store::get_active_table_options (i
 
 	// Increasing block_size decreases memory usage and space amplification, but increases read amplification.
 	table_options.block_size = 16 * 1024ULL;
+
+	// https://rocksdb.org/blog/2019/03/08/format-version-4.html
+//	table_options.format_version = 4;
+//	table_options.index_block_restart_interval = 16;
 
 	// Whether level 0 index and filter blocks are stored in block_cache
 	table_options.pin_l0_filter_and_index_blocks_in_cache = true;
