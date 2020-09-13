@@ -59,7 +59,7 @@ mutexes (mutexes_a)
 	lock ();
 	rocksdb::TransactionOptions txn_options;
 	txn_options.deadlock_detect = false;
-	txn_options.skip_concurrency_control = false;
+	txn_options.skip_concurrency_control = true;
 	txn_options.set_snapshot = true;
 	txn = db->BeginTransaction (rocksdb::WriteOptions (), txn_options);
 }
@@ -91,7 +91,7 @@ void nano::write_rocksdb_txn::renew ()
 {
 	rocksdb::TransactionOptions txn_options;
 	txn_options.deadlock_detect = false;
-	txn_options.skip_concurrency_control = false;
+	txn_options.skip_concurrency_control = true;
 	txn_options.set_snapshot = true;
 	db->BeginTransaction (rocksdb::WriteOptions (), txn_options, txn);
 }
