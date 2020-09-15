@@ -444,13 +444,13 @@ void nano::rocksdb_store::flush_tombstones_check (tables table_a)
 void nano::rocksdb_store::flush_table (nano::tables table_a)
 {
 	db->Flush (rocksdb::FlushOptions{}, table_to_column_family (table_a));
-	if (table_a == nano::tables::unchecked)
+/*	if (table_a == nano::tables::unchecked)
 	{
 		rocksdb::CompactRangeOptions compact_range_options;
 		compact_range_options.exclusive_manual_compaction = false;
 		compact_range_options.max_subcompactions = std::min (1u, rocksdb_config.io_threads / 2);
 		db->CompactRange (compact_range_options, table_to_column_family (table_a), nullptr, nullptr);
-	}
+	}*/
 }
 
 void nano::rocksdb_store::version_put (nano::write_transaction const & transaction_a, int version_a)
