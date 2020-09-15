@@ -120,6 +120,7 @@ void nano::rocksdb_store::open (bool & error_a, boost::filesystem::path const & 
 	else
 	{
 		s = rocksdb::OptimisticTransactionDB::Open (options, path_a.string (), column_families, &handles_l, &optimistic_db);
+		std::cout << s.ToString () << std::endl;
 		if (optimistic_db)
 		{
 			db.reset (optimistic_db);
@@ -197,11 +198,58 @@ rocksdb::ColumnFamilyOptions nano::rocksdb_store::get_cf_options (std::string co
 	if (cf_name_a == "unchecked")
 	{
 		// Unchecked table can have a lot of deletions, so increase compaction frequency.
-		std::shared_ptr<rocksdb::TableFactory> table_factory (rocksdb::NewBlockBasedTableFactory (get_active_table_options (block_cache_size_bytes * 2)));
-		cf_options = get_active_cf_options (table_factory, memtable_size_bytes);
+		rocksdb::PlainTableOptions table_options;
+		table_options.bloom_bits_per_key = 10;
+		table_options.full_scan_mode = false;
+		table_options.store_index_in_file = true;
+		table_options.encoding_type = rocksdb::EncodingType::kPrefix; // TODO: Check this
+		table_options.hash_table_ratio = 0.75;
+		//	table_options.index_type = rocksdb::BlockBasedTableOptions::kHashSearch; // Only for block based ones
+		table_options.user_key_len = sizeof (nano::unchecked_key); // Should be 64; // Size of unchecked_key
+		std::shared_ptr<rocksdb::TableFactory> table_factory (rocksdb::NewPlainTableFactory (table_options));
+
+//		std::shared_ptr<rocksdb::TableFactory> table_factory (rocksdb::NewBlockBasedTableFactory (get_active_table_options (block_cache_size_bytes * 2)));
+
+
+
+	rocksdb::ColumnFamilyOptions cf_options;
+	cf_options.table_factory = table_factory;
+
+	auto write_buffer_size = memtable_size_bytes;
+
+	// (1 active, 1 inactive)
+	auto num_memtables = 2;
+
+	// Each level is a multiple of the above. If L1 is 512MB. L2 will be 512 * 8 = 2GB. L3 will be 2GB * 8 = 16GB, and so on...
+	cf_options.max_bytes_for_level_multiplier = 8;
+
+	// Although this should be the default provided by RocksDB, not setting this is causing sequence conflict checks if not using
+	cf_options.max_write_buffer_size_to_maintain = memtable_size_bytes * num_memtables;
+
+	// Files older than this (1 day) will be scheduled for compaction when there is no other background work. This can lead to more writes however.
+	//cf_options.ttl = 1 * 24 * 60 * 60;
+
+	// Multiplier for each level
+	cf_options.target_file_size_multiplier = 10;
+
+	// Size of level 1 sst files
+	cf_options.target_file_size_base = memtable_size_bytes;
+
+	// Size of each memtable
+	cf_options.write_buffer_size = memtable_size_bytes;
+
+	// Number of memtables to keep in memory
+	cf_options.max_write_buffer_number = num_memtables;
+
+	// Size target of levels are changed dynamically based on size of the last level
+	cf_options.level_compaction_dynamic_level_bytes = true;
+
+
+
+
 
 		// Create prefix bloom for memtable with the size of write_buffer_size * memtable_prefix_bloom_size_ratio
-		cf_options.memtable_prefix_bloom_size_ratio = 0.1;
+		cf_options.memtable_prefix_bloom_size_ratio = 0.25;
 		// The prefix to use is the size of the unchecked key (root)
 		cf_options.prefix_extractor.reset (rocksdb::NewFixedPrefixTransform (sizeof (nano::root)));
 
@@ -210,7 +258,7 @@ rocksdb::ColumnFamilyOptions nano::rocksdb_store::get_cf_options (std::string co
 
 		// L1 size, compaction is triggered for L0 at this size (2 SST files in L1)
 		cf_options.max_bytes_for_level_base = memtable_size_bytes * 2;
-		cf_options.max_bytes_for_level_multiplier = 10; // Default
+	//	cf_options.max_bytes_for_level_multiplier = 10; // Default
 	}
 	else if (cf_name_a == "blocks")
 	{
@@ -396,11 +444,13 @@ void nano::rocksdb_store::flush_tombstones_check (tables table_a)
 void nano::rocksdb_store::flush_table (nano::tables table_a)
 {
 	db->Flush (rocksdb::FlushOptions{}, table_to_column_family (table_a));
-
-	rocksdb::CompactRangeOptions compact_range_options;
-	compact_range_options.exclusive_manual_compaction = false;
-	compact_range_options.max_subcompactions = std::min (1u, rocksdb_config.io_threads / 2);
-	db->CompactRange (compact_range_options, table_to_column_family (table_a), nullptr, nullptr);
+	if (table_a == nano::tables::unchecked)
+	{
+		rocksdb::CompactRangeOptions compact_range_options;
+		compact_range_options.exclusive_manual_compaction = false;
+		compact_range_options.max_subcompactions = std::min (1u, rocksdb_config.io_threads / 2);
+		db->CompactRange (compact_range_options, table_to_column_family (table_a), nullptr, nullptr);
+	}
 }
 
 void nano::rocksdb_store::version_put (nano::write_transaction const & transaction_a, int version_a)
@@ -606,6 +656,7 @@ rocksdb::Options nano::rocksdb_store::get_db_options ()
 	rocksdb::Options db_options;
 	db_options.create_if_missing = true;
 	db_options.create_missing_column_families = true;
+	db_options.allow_concurrent_memtable_write = false;
 
 	// Sets the compaction priority
 	db_options.compaction_pri = rocksdb::CompactionPri::kMinOverlappingRatio;
