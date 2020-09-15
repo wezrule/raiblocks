@@ -244,8 +244,7 @@ rocksdb::ColumnFamilyOptions nano::rocksdb_store::get_cf_options (std::string co
 	// Size target of levels are changed dynamically based on size of the last level
 	cf_options.level_compaction_dynamic_level_bytes = true;
 
-
-
+	cf_options.memtable_factory.reset (rocksdb::NewHashSkipListRepFactory ());
 
 
 		// Create prefix bloom for memtable with the size of write_buffer_size * memtable_prefix_bloom_size_ratio
