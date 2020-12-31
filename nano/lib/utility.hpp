@@ -24,7 +24,7 @@ namespace system
 }
 }
 
-void assert_internal (const char * check_expr, const char * func, const char * file, unsigned int line, bool is_release_assert, std::string_view error = "");
+void assert_internal (const char * check_expr, const char * func, const char * file, unsigned int line, bool is_release_assert, std::string error = "");
 
 #define release_assert_1(check) check ? (void)0 : assert_internal (#check, BOOST_CURRENT_FUNCTION, __FILE__, __LINE__, true)
 #define release_assert_2(check, error_msg) check ? (void)0 : assert_internal (#check, BOOST_CURRENT_FUNCTION, __FILE__, __LINE__, true, error_msg)
