@@ -6,6 +6,12 @@
 
 #include <crypto/cryptopp/words.h>
 
+#define release_assert_success(status)                 \
+	if (!success (status))                             \
+	{                                                  \
+		release_assert (false, error_string (status)); \
+	}
+
 namespace nano
 {
 template <typename Val, typename Derived_Store>
@@ -503,7 +509,7 @@ public:
 	{
 		nano::db_val<Val> info (info_a);
 		auto status (put (transaction_a, tables::unchecked, key_a, info));
-		release_assert (success (status));
+		release_assert_success (status);
 	}
 
 	void unchecked_del (nano::write_transaction const & transaction_a, nano::unchecked_key const & key_a) override
@@ -1024,6 +1030,7 @@ protected:
 	virtual bool not_found (int status) const = 0;
 	virtual bool success (int status) const = 0;
 	virtual int status_code_not_found () const = 0;
+	virtual std::string error_string (int status) const { return std::to_string (status); };
 };
 
 /**

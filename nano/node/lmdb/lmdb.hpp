@@ -212,6 +212,7 @@ public:
 	}
 
 	bool init_error () const override;
+	std::string error_string (int status) const override;
 
 	size_t count (nano::transaction const &, MDB_dbi) const;
 

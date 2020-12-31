@@ -879,6 +879,11 @@ void nano::mdb_store::create_backup_file (nano::mdb_env & env_a, boost::filesyst
 	}
 }
 
+std::string nano::mdb_store::error_string (int status) const
+{
+	return mdb_strerror (status);
+}
+
 void nano::mdb_store::version_put (nano::write_transaction const & transaction_a, int version_a)
 {
 	nano::uint256_union version_key (1);
