@@ -40,12 +40,17 @@ void assert_internal (const char * check_expr, const char * func, const char * f
 #define release_assert(...)                          \
 	BOOST_PP_OVERLOAD (release_assert_, __VA_ARGS__) \
 	(__VA_ARGS__)
+#ifndef NDEBUG
 #define debug_assert(...)                          \
 	BOOST_PP_OVERLOAD (debug_assert_, __VA_ARGS__) \
 	(__VA_ARGS__)
+#endif
 #else
 #define release_assert(...) BOOST_PP_CAT (BOOST_PP_OVERLOAD (release_assert_, __VA_ARGS__) (__VA_ARGS__), BOOST_PP_EMPTY ())
+
+#ifndef NDEBUG
 #define debug_assert(...) BOOST_PP_CAT (BOOST_PP_OVERLOAD (debug_assert_, __VA_ARGS__) (__VA_ARGS__), BOOST_PP_EMPTY ())
+#endif
 #endif
 
 
