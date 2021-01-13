@@ -751,7 +751,7 @@ nano::public_key nano::wallet::deterministic_insert (bool generate_work_a)
 	return result;
 }
 
-nano::public_key nano::wallet::insert_adhoc (nano::transaction const & transaction_a, nano::raw_key const & key_a, bool generate_work_a)
+nano::public_key nano::wallet::insert_adhoc (nano::write_transaction & transaction_a, nano::raw_key const & key_a, bool generate_work_a)
 {
 	nano::public_key key (0);
 	if (store.valid_password (transaction_a))
@@ -765,8 +765,12 @@ nano::public_key nano::wallet::insert_adhoc (nano::transaction const & transacti
 		auto half_principal_weight (wallets.node.minimum_principal_weight () / 2);
 		if (wallets.check_rep (key, half_principal_weight))
 		{
-			nano::lock_guard<std::mutex> lock (representatives_mutex);
-			representatives.insert (key);
+			transaction_a.commit ();
+			{
+				nano::lock_guard<std::mutex> lock (representatives_mutex);
+				representatives.insert (key);
+			}
+			transaction_a.renew ();
 		}
 	}
 	return key;
@@ -1806,6 +1810,7 @@ void nano::wallets::ongoing_compute_reps ()
 	auto compute_delay (network_params.network.is_dev_network () ? std::chrono::milliseconds (10) : std::chrono::milliseconds (15 * 60 * 1000)); // Representation drifts quickly on the test network but very slowly on the live network
 	node.workers.add_timed_task (std::chrono::steady_clock::now () + compute_delay, [&node_l]() {
 		node_l.wallets.ongoing_compute_reps ();
+		std::cout << "Ongoing compute reps" << std::endl;
 	});
 }
 
